@@ -62,7 +62,7 @@ inline PreampSpec evhSpec(EVHVoice voice,ColdBias bias,CathodeBypass bypass){
 }
 struct PreampStage {
  double cath=0, coupling=0, peak=0, lastCurrent=0; bool init=false;
- double process(double in,double supply,double dt,const StageSpec& s,double pot=1.,double bright=0.,bool usePot=false){
+ double process(double in,double supply,double dt,const StageSpec& s,double pot=1.,double bright=0.,bool usePot=false,bool eco=false){
  // Implicit coupling capacitor/grid leak and piecewise grid conduction.
  // Backward-Euler nodal solve: coupling cap, series peaker, pot and grid load.
  const double sourceR=38000.;
@@ -84,14 +84,23 @@ struct PreampStage {
  if(vg>threshold)vg=(drive+gd*threshold)/(effective+gl+gd);
  const double node=(rhs+link*vg+gp*peak)/den;
  coupling=in-node;peak=node-vg;
- double i=solve(vg,cath,s.ck>0);
+ double i;
+ if(eco){
+ double k=s.ck>0?cath:0.;
+ double u=std::max(0.,1.125+vg-k+2+(supply-k-250)/100);
+ constexpr double K=.0012/(1.125*1.0606601717798212);
+ double a=K*(s.rp/100+(s.ck>0?0.:s.rk*1.01));
+ double z=std::sqrt(u/(1+a*std::sqrt(u)));
+ for(int j=0;j<2;++j)z=std::max(0.,z-(z*z+a*z*z*z-u)/std::max(1e-12,2*z+3*a*z*z));
+ i=std::min(supply/(s.rp+(s.ck>0?0.:s.rk)),K*z*z*z);
+ }else i=solve(vg,cath,s.ck>0);
  if(s.ck>0)cath+=(i*s.rk-cath)*(-std::expm1(-dt/(s.rk*s.ck)));else cath=i*s.rk;
  return supply-i*s.rp;
  }
 };
 struct Preamp {
  std::array<PreampStage,5> stages{}; ToneStack tone; JoseClip jose; PreampModel active=PreampModel::Marshall; EVHVoice evhActive=EVHVoice::Blue; bool initialized=false; bool extraActive=true,gain2Ready=false; double gain1DC=0; bool gain1Ready=false; double gain2DC=0; double outputDC=0, followerDC=0; JoseArchitecture archActive=JoseArchitecture::Legacy; ColdBias biasActive=ColdBias::Native; CathodeBypass bypassActive=CathodeBypass::Native;
- double process(double input,double supply,double dt,PreampModel model,double gain,double bass,double mid,double treble,JoseEra era=JoseEra::Zener20,bool extraStage=true,double gain2=.7,JoseArchitecture arch=JoseArchitecture::Legacy,ColdBias bias=ColdBias::Native,CathodeBypass bypass=CathodeBypass::Native,RectoVoice recto=RectoVoice::EarlyRed,EVHVoice evh=EVHVoice::Blue){
+ double process(double input,double supply,double dt,PreampModel model,double gain,double bass,double mid,double treble,JoseEra era=JoseEra::Zener20,bool extraStage=true,double gain2=.7,JoseArchitecture arch=JoseArchitecture::Legacy,ColdBias bias=ColdBias::Native,CathodeBypass bypass=CathodeBypass::Native,RectoVoice recto=RectoVoice::EarlyRed,EVHVoice evh=EVHVoice::Blue,bool eco=false){
  bool evhFamily=model==PreampModel::EVH5150III; if(!evhFamily)evh=model==PreampModel::EVHRed?EVHVoice::Red:EVHVoice::Blue; model=resolveEVH(model,evh);
  model=resolveRecto(model,recto);
  if(arch==JoseArchitecture::Legacy)arch=extraStage?JoseArchitecture::HBE:JoseArchitecture::Classic;
@@ -102,11 +111,11 @@ struct Preamp {
  bool second=model==PreampModel::Jose && arch!=JoseArchitecture::Stock && i==2;
  double pos=first?std::clamp(gain,0.,1.):second?std::clamp(gain2,0.,1.):1.;
  double bright=first&&(model==PreampModel::Marshall||(model==PreampModel::Jose&&arch==JoseArchitecture::Stock))?470e-12:0.;
- v=stages[i].process(v,supply,dt,p.stages[i],pos,bright,first||second);
+ v=stages[i].process(v,supply,dt,p.stages[i],pos,bright,first||second,eco);
  }
 
  // Reduced cathode follower: unity-ish gain with asymmetric headroom, DC removed.
- double follower=v; if(!(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)){double lo=0,hi=supply;for(int j=0;j<10;++j){double k=(lo+hi)*.5; if(triodeCurrent(supply-k,v-k)>k/100000.)lo=k;else hi=k;} follower=(lo+hi)*.5;}if(followerDC==0)followerDC=follower;followerDC+=dt/(.02+dt)*(follower-followerDC);v=(follower-followerDC); if(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)v=(follower-followerDC);
+ double follower=v; if(!(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)){double lo=0,hi=supply;for(int j=0;j<(eco?7:10);++j){double k=(lo+hi)*.5; if(triodeCurrent(supply-k,v-k)>k/100000.)lo=k;else hi=k;} follower=(lo+hi)*.5;}if(followerDC==0)followerDC=follower;followerDC+=dt/(.02+dt)*(follower-followerDC);v=(follower-followerDC); if(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)v=(follower-followerDC);
  if(model==PreampModel::Jose && arch!=JoseArchitecture::Stock)v=jose.process(v,dt,era);
  return tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.);
  }
