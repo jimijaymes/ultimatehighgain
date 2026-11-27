@@ -1,0 +1,29 @@
+#pragma once
+#include <cmath>
+#include <algorithm>
+#include "Tubes.h"
+namespace uhg {
+struct ToneStack {
+ double history[3]{};
+ double process(double in,double dt,double bass,double mid,double treble,double slope=33000,double ct=470e-12,double cb=22e-9,double cm=22e-9,double sourceR=0){
+ double a[6][7]{};
+ auto stamp=[&](int i,int j,double g,double h=0.){if(i>=0){a[i][i]+=g;a[i][6]+=h;}if(j>=0){a[j][j]+=g;a[j][6]-=h;}if(i>=0&&j>=0){a[i][j]-=g;a[j][i]-=g;}};
+ auto cap=[&](int i,int j,double c,int k,double source=0.){double g=c/dt;stamp(i,j,g,g*(history[k]+source));};
+ stamp(0,5,1./slope);stamp(5,-1,1./std::max(1.,sourceR),in/std::max(1.,sourceR));
+ cap(1,5,ct,0);cap(0,2,cb,1);cap(0,3,cm,2);
+ stamp(2,3,1./(100+1e6*bass));stamp(3,-1,1./(100+25000*mid));
+ stamp(1,4,1./(100+250000*(1-treble)));stamp(4,2,1./(100+250000*treble));stamp(4,-1,1e-6);
+ for(int k=0;k<6;k++){double d=a[k][k];for(int j=k;j<7;j++)a[k][j]/=d;for(int i=0;i<6;i++)if(i!=k){double f=a[i][k];for(int j=k;j<7;j++)a[i][j]-=f*a[k][j];}}
+ history[0]=a[1][6]-a[5][6];history[1]=a[0][6]-a[2][6];history[2]=a[0][6]-a[3][6];return a[4][6];
+ }
+};
+struct PhaseInverter {
+ double dc1=0,dc2=0; bool initialized=false;
+ static double current(double grid,double cath,double supply,double r){double lo=0,hi=supply/r;for(int k=0;k<16;k++){double i=(lo+hi)*.5;double p=supply-i*r;double m=triodeCurrent(p-cath,grid-cath);if(m>i)lo=i;else hi=i;}return (lo+hi)*.5;}
+ void process(double input,double feedback,double supply,double dt,double &o1,double &o2){
+ double lo=0,hi=supply*.5;double i1=0,i2=0;for(int k=0;k<17;k++){double cath=(lo+hi)*.5;i1=current(input,cath,supply,82000);i2=current(feedback,cath,supply,100000);if((i1+i2)*10470>cath)lo=cath;else hi=cath;}
+ double p1=supply-i1*82000,p2=supply-i2*100000;if(!initialized){dc1=p1;dc2=p2;initialized=true;}double alpha=1-std::exp(-6.283185307*2*dt);dc1+=alpha*(p1-dc1);dc2+=alpha*(p2-dc2);o1=dc1-p1;o2=dc2-p2;
+ }
+};
+struct GridCoupling {double charge=0;double process(double drive,double bias,double dt){double c=22e-9,r=220000,rs=5600;double g=1/r+c/dt;double v=(bias/r+c/dt*(drive-charge))/g; if(v>0)v=(bias/r+c/dt*(drive-charge))/(g+1/rs);charge=drive-v;return v;}};
+}
