@@ -90,9 +90,7 @@ struct PreampStage {
  double u=std::max(0.,1.125+vg-k+2+(supply-k-250)/100);
  constexpr double K=.0012/(1.125*1.0606601717798212);
  double a=K*(s.rp/100+(s.ck>0?0.:s.rk*1.01));
- double z=std::sqrt(u/(1+a*std::sqrt(u)));
- for(int j=0;j<2;++j)z=std::max(0.,z-(z*z+a*z*z*z-u)/std::max(1e-12,2*z+3*a*z*z));
- i=std::min(supply/(s.rp+(s.ck>0?0.:s.rk)),K*z*z*z);
+ i=std::min(supply/(s.rp+(s.ck>0?0.:s.rk)),K*triodeLoad.get(u,a));
  }else i=solve(vg,cath,s.ck>0);
  if(s.ck>0)cath+=(i*s.rk-cath)*(-std::expm1(-dt/(s.rk*s.ck)));else cath=i*s.rk;
  return supply-i*s.rp;
