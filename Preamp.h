@@ -62,15 +62,19 @@ inline PreampSpec evhSpec(EVHVoice voice,ColdBias bias,CathodeBypass bypass){
 }
 struct PreampStage {
  double cath=0, coupling=0, peak=0, lastCurrent=0; bool init=false;
+ std::array<double,7> coeffKey{};bool coeffReady=false;double gc=0,gp=0,gr=0,gl=0,link=0,den=0,effective=0;
  double process(double in,double supply,double dt,const StageSpec& s,double pot=1.,double bright=0.,bool usePot=false,bool eco=false){
  // Implicit coupling capacitor/grid leak and piecewise grid conduction.
  // Backward-Euler nodal solve: coupling cap, series peaker, pot and grid load.
- const double sourceR=38000.;
+ const std::array<double,7> key{dt,s.cc,s.rg,s.atten,s.peakC+bright,pot,usePot?1.:0.};
+ if(!coeffReady||key!=coeffKey){
  const double top=usePot?std::max(1.,1e6*(1.-pot)):1.;
  const double bottom=usePot?std::max(1.,1e6*pot):1e12;
- const double series=s.rg*(1./std::max(.001,s.atten)-1.);
- const double rs=std::max(1.,sourceR+series+top);
- const double cp=s.peakC+bright;
+ const double rs=std::max(1.,38000.+s.rg*(1./std::max(.001,s.atten)-1.)+top);
+ gc=s.cc/dt;gp=(s.peakC+bright)/dt;gr=1./rs;gl=1./s.rg+1./bottom;
+ link=gr+gp;den=gc+link;effective=link*gc/den;
+ coeffKey=key;coeffReady=true;
+ }
  if(!init){coupling=in;peak=0;}
  auto solve=[&](double grid,double fixedCath,bool bypass){
  double lo=0,hi=std::max(0.,(supply-(bypass?fixedCath:0.))/(s.rp+(bypass?0.:s.rk)));
@@ -93,11 +97,9 @@ struct PreampStage {
  }
  lastCurrent=cur;return cur;};
  if(!init){cath=solve(0,0,false)*s.rk;init=true;}
- const double gc=s.cc/dt, gp=cp/dt, gr=1./rs, gl=1./s.rg+1./bottom, gd=1./68000., threshold=cath+.5;
+ const double gd=1./68000., threshold=cath+.5;
  // Two-node companion model, capacitor across series resistance.
- const double link=gr+gp, den=gc+link;
  const double rhs=gc*(in-coupling);
- const double effective=link*gc/den;
  const double drive=link*rhs/den-gp*peak*gc/den;
  double vg=drive/(effective+gl);
  if(vg>threshold)vg=(drive+gd*threshold)/(effective+gl+gd);
