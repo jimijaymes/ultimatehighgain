@@ -20,13 +20,14 @@ struct ToneStack {
  }
 };
 // Reduced-order shared-tail nonlinear LTP, DC operating point removed.
+struct PhaseInverterSpec {double plate1=82000,plate2=100000,tail=10470,coupling=22e-9,gridLeak=220000,gridStop=5600;};
 struct PhaseInverter {
  double dc1=0,dc2=0; bool initialized=false;
  static double current(double grid,double cath,double supply,double r){double lo=0,hi=supply/r;for(int k=0;k<16;k++){double i=(lo+hi)*.5;double p=supply-i*r;double m=triodeCurrent(p-cath,grid-cath);if(m>i)lo=i;else hi=i;}return (lo+hi)*.5;}
- void process(double input,double feedback,double supply,double dt,double &o1,double &o2){
- double lo=0,hi=supply*.5;double i1=0,i2=0;for(int k=0;k<17;k++){double cath=(lo+hi)*.5;i1=current(input,cath,supply,82000);i2=current(feedback,cath,supply,100000);if((i1+i2)*10470>cath)lo=cath;else hi=cath;}
- double p1=supply-i1*82000,p2=supply-i2*100000;if(!initialized){dc1=p1;dc2=p2;initialized=true;}double alpha=1-std::exp(-6.283185307*2*dt);dc1+=alpha*(p1-dc1);dc2+=alpha*(p2-dc2);o1=dc1-p1;o2=dc2-p2;
+ void process(double input,double feedback,double supply,double dt,double &o1,double &o2,PhaseInverterSpec spec={}){
+ double lo=0,hi=supply*.5;double i1=0,i2=0;for(int k=0;k<17;k++){double cath=(lo+hi)*.5;i1=current(input,cath,supply,spec.plate1);i2=current(feedback,cath,supply,spec.plate2);if((i1+i2)*spec.tail>cath)lo=cath;else hi=cath;}
+ double p1=supply-i1*spec.plate1,p2=supply-i2*spec.plate2;if(!initialized){dc1=p1;dc2=p2;initialized=true;}double alpha=1-std::exp(-6.283185307*2*dt);dc1+=alpha*(p1-dc1);dc2+=alpha*(p2-dc2);o1=dc1-p1;o2=dc2-p2;
  }
 };
-struct GridCoupling {double charge=0;double process(double drive,double bias,double dt){double c=22e-9,r=220000,rs=5600;double g=1/r+c/dt;double v=(bias/r+c/dt*(drive-charge))/g; if(v>0)v=(bias/r+c/dt*(drive-charge))/(g+1/rs);charge=drive-v;return v;}};
+struct GridCoupling {double charge=0;double process(double drive,double bias,double dt,PhaseInverterSpec spec={}){double c=spec.coupling,r=spec.gridLeak,rs=spec.gridStop;double g=1/r+c/dt;double v=(bias/r+c/dt*(drive-charge))/g; if(v>0)v=(bias/r+c/dt*(drive-charge))/(g+1/rs);charge=drive-v;return v;}};
 }
