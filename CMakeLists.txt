@@ -48,3 +48,7 @@ if(UHG_BUILD_PLUGIN)
  target_compile_definitions(UltimateHighGain PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
  target_link_libraries(UltimateHighGain PRIVATE juce::juce_audio_utils juce::juce_dsp juce::juce_recommended_config_flags)
 endif()
+
+add_executable(stability_test stability_test.cpp)
+target_compile_features(stability_test PRIVATE cxx_std_17)
+add_test(NAME full_amp_stability COMMAND stability_test)
