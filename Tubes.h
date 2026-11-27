@@ -20,13 +20,13 @@ inline double screenCurrent(TubeData t,double vp,double vg,double vs){double sha
 // Factorised lookup of the ECC83 resistive load line. Axis u is effective
 // grid overdrive; axis a represents the combined plate/cathode resistance.
 struct TriodeLoadTable {
- static constexpr int U=513,A=129;
+ static constexpr int U=1025,A=257;
  std::array<float,U*A> table{};
- TriodeLoadTable(){for(int j=0;j<A;++j){double a=8.*j/(A-1);for(int i=0;i<U;++i){double u=128.*i/(U-1),lo=0,hi=std::sqrt(u);for(int k=0;k<28;++k){double z=(lo+hi)*.5;if(z*z+a*z*z*z>u)hi=z;else lo=z;}double z=(lo+hi)*.5;table[j*U+i]=float(z*z*z);}}}
+ TriodeLoadTable(){for(int j=0;j<A;++j){double a=std::expm1(std::log(257.)*j/(A-1));for(int i=0;i<U;++i){double u=128.*i*i/((U-1.)*(U-1.)),lo=0,hi=std::sqrt(u);for(int k=0;k<28;++k){double z=(lo+hi)*.5;if(z*z+a*z*z*z>u)hi=z;else lo=z;}double z=(lo+hi)*.5;table[j*U+i]=float(z*z*z);}}}
  double get(double u,double a)const{
  if(u<=0)return 0.;
- if(u>128||a<0||a>8){double lo=0,hi=std::sqrt(u);for(int k=0;k<24;++k){double z=(lo+hi)*.5;if(z*z+a*z*z*z>u)hi=z;else lo=z;}double z=(lo+hi)*.5;return z*z*z;}
- double x=u*(U-1)/128.,y=a*(A-1)/8.;int i=std::min(U-2,int(x)),j=std::min(A-2,int(y));double f=x-i,g=y-j;
+ if(u>128||a<0||a>256){double lo=0,hi=std::sqrt(u);for(int k=0;k<24;++k){double z=(lo+hi)*.5;if(z*z+a*z*z*z>u)hi=z;else lo=z;}double z=(lo+hi)*.5;return z*z*z;}
+ double x=std::sqrt(u/128.)*(U-1),y=std::log1p(a)*(A-1)/std::log(257.);int i=std::min(U-2,int(x)),j=std::min(A-2,int(y));double f=x-i,g=y-j;
  double p=table[j*U+i]*(1-f)+table[j*U+i+1]*f,q=table[(j+1)*U+i]*(1-f)+table[(j+1)*U+i+1]*f;return p+(q-p)*g;
  }
 };
