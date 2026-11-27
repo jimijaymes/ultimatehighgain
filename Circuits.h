@@ -40,9 +40,7 @@ struct PhaseInverter {
   double available=std::max(0.,supply-cath);
   double u=std::max(0.,1.125+grid-cath+2+(available-250)/100);
   constexpr double K=.0012/(1.125*1.0606601717798212);
-  double a=K*r/100., z=std::sqrt(u/(1+a*std::sqrt(u)));
-  for(int j=0;j<2;++j)z=std::max(0.,z-(z*z+a*z*z*z-u)/std::max(1e-12,2*z+3*a*z*z));
-  return std::min(available/r,K*z*z*z);
+  double a=K*r/100.; return std::min(available/r,K*triodeLoad.get(u,a));
  }
  double tailEstimate=0;
  void process(double input,double feedback,double supply,double dt,double &o1,double &o2,PhaseInverterSpec spec={},bool eco=false){
