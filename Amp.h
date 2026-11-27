@@ -18,7 +18,19 @@ struct PresenceNetwork {
  }
 };
 struct Circuit {double B=450, screen=440, primary=1700, load=8, pairs=2, reservoir=50e-6, supplyR=65, screenR=1000, feedbackR=100000, feedbackGround=4700, presenceR=25000, presenceC=100e-9, feedbackTap=4, transformerL=20, leakage=.001, fluxLimit=.65;};
-struct Controls {double presence=.5, gain=.5, master=.25, bass=.5, mid=.5, treble=.5; bool spongy=false,tubeRect=false; Tube tube=Tube::EL34; PreampModel preamp=PreampModel::Marshall; JoseEra joseEra=JoseEra::Zener20; bool joseExtraStage=true; double joseGain2=.7; JoseArchitecture joseArchitecture=JoseArchitecture::Legacy; ColdBias joseBias=ColdBias::Native; CathodeBypass joseBypass=CathodeBypass::Native; ColdBias coldBias=ColdBias::Native; CathodeBypass coldBypass=CathodeBypass::Native; RectoVoice rectoVoice=RectoVoice::EarlyRed; EVHVoice evhVoice=EVHVoice::Blue;};
+enum class PowerModel { Marshall, Peavey, RectoVintage, RectoModern, VHT, EVH, MiniRecto, AC30, AC50, SLO };
+// Provisional architecture seeds; not verified schematic transcriptions.
+inline Circuit powerCircuit(PowerModel m){ Circuit q; switch(m){
+case PowerModel::Peavey: q.B=490;q.screen=475;q.primary=1900;q.feedbackR=47000;q.reservoir=100e-6;q.supplyR=35;break;
+case PowerModel::RectoVintage: case PowerModel::RectoModern: q.B=460;q.screen=450;q.primary=1900;q.reservoir=100e-6;q.feedbackR=82000;q.supplyR=45;break;
+case PowerModel::VHT: q.B=500;q.screen=480;q.primary=1900;q.feedbackR=33000;q.supplyR=25;q.reservoir=150e-6;break;
+case PowerModel::EVH: q.B=480;q.screen=465;q.primary=1900;q.feedbackR=47000;q.supplyR=35;q.reservoir=100e-6;break;
+case PowerModel::MiniRecto: q.B=350;q.screen=330;q.primary=8000;q.pairs=1;q.reservoir=47e-6;q.supplyR=85;break;
+case PowerModel::AC30: q.B=320;q.screen=310;q.primary=4000;q.reservoir=32e-6;q.supplyR=90;break;
+case PowerModel::AC50: q.B=440;q.screen=420;q.primary=3400;q.pairs=1;q.feedbackR=56000;q.reservoir=50e-6;break;
+case PowerModel::SLO: q.B=500;q.screen=480;q.primary=1900;q.feedbackR=39000;q.reservoir=100e-6;q.supplyR=35;break;
+default: break;}return q;}
+struct Controls {bool linkPower=true; PowerModel power=PowerModel::Marshall;double presence=.5, gain=.5, master=.25, bass=.5, mid=.5, treble=.5; bool spongy=false,tubeRect=false; Tube tube=Tube::EL34; PreampModel preamp=PreampModel::Marshall; JoseEra joseEra=JoseEra::Zener20; bool joseExtraStage=true; double joseGain2=.7; JoseArchitecture joseArchitecture=JoseArchitecture::Legacy; ColdBias joseBias=ColdBias::Native; CathodeBypass joseBypass=CathodeBypass::Native; ColdBias coldBias=ColdBias::Native; CathodeBypass coldBypass=CathodeBypass::Native; RectoVoice rectoVoice=RectoVoice::EarlyRed; EVHVoice evhVoice=EVHVoice::Blue;};
 struct Triode {
  double cap=0, blocking=0;
  double process(double input,double dt,double supply,double cathodeR){
@@ -29,16 +41,18 @@ struct Triode {
  }
 };
 struct Engine {
- Circuit circuit; Controls controls; double fs=48000,dt=1./192000; Preamp preamp; PhaseInverter pi; GridCoupling grid1,grid2; double magI=0; PresenceNetwork presenceNet; double supply=450, screen=440,bias=-40, fb=0,fbLow=0,flux=0,leak=0,capV=0,indI=0,coilI=0, bassZ=0,trebleZ=0, prev=0,gridBlock=0; double peakPlate=0; Tube active=Tube::EL34; bool ready=false;
+ Circuit circuit; Controls controls; double fs=48000,dt=1./192000; Preamp preamp; PhaseInverter pi; GridCoupling grid1,grid2; double magI=0; PresenceNetwork presenceNet; double supply=450, screen=440,bias=-40, fb=0,fbLow=0,flux=0,leak=0,capV=0,indI=0,coilI=0, bassZ=0,trebleZ=0, prev=0,gridBlock=0; double peakPlate=0; Tube active=Tube::EL34; bool ready=false; PowerModel activePower=PowerModel::Marshall;
+ PowerModel selectedPower() const {if(!controls.linkPower)return controls.power; switch(controls.preamp){case PreampModel::Peavey5150:return PowerModel::Peavey;case PreampModel::DualRectifier:return controls.rectoVoice==RectoVoice::EarlyOrange?PowerModel::RectoVintage:PowerModel::RectoModern;case PreampModel::VHT:return PowerModel::VHT;case PreampModel::EVH5150III:return PowerModel::EVH;default:return PowerModel::Marshall;}}
+
  void prepare(double rate){fs=rate;dt=1/(4*fs);reset();}
  void reset(){preamp={};pi={};grid1={};grid2={};magI=0;presenceNet={};supply=circuit.B;screen=circuit.screen;fb=fbLow=flux=leak=capV=indI=coilI=bassZ=trebleZ=prev=gridBlock=peakPlate=0;active=controls.tube;ready=false;}
  double biasFor(TubeData t,double v,double s){double lo=-200,hi=0;double target=std::min(t.idle,.65*t.rating/std::max(1.,v));for(int i=0;i<32;++i){double m=(lo+hi)*.5;if(plate(t,v,m,s)>target)hi=m;else lo=m;}return (lo+hi)*.5;}
- double step(double x){auto &q=circuit;auto t=data(controls.tube);double target=q.B*(controls.spongy?.85:1.)-(controls.tubeRect?20:0);if(!ready||active!=controls.tube){bias=biasFor(t,target,q.screen*target/q.B);grid1.charge=-bias;grid2.charge=-bias;active=controls.tube;ready=true;}
+ double step(double x){auto m=selectedPower();if(m!=activePower){circuit=powerCircuit(m);activePower=m;reset();}auto &q=circuit;auto t=data(controls.tube);double target=q.B*(controls.spongy?.85:1.)-(controls.tubeRect?20:0);if(!ready||active!=controls.tube){bias=biasFor(t,target,q.screen*target/q.B);grid1.charge=-bias;grid2.charge=-bias;active=controls.tube;ready=true;}
  // 0 dBu = .775 Vrms; -14 dBFS sine = .1995 peak.
  double v=x*(.775*std::sqrt(2.)/std::pow(10.,-14./20.));
  v=preamp.process(v,supply*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice)*controls.master;
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
- double feedback=presenceNet.process(fb*std::sqrt(q.feedbackTap/q.load),dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC);
+ double feedback=(activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*std::sqrt(q.feedbackTap/q.load),dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC);
  double d1,d2;pi.process(clamp(v,-30.,30.),feedback,supply*.72,dt,d1,d2);
  double g1=grid1.process(d1,bias,dt),g2=grid2.process(d2,bias,dt);
  double ratio=std::sqrt(q.primary/q.load);
