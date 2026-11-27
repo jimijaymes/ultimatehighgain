@@ -79,9 +79,10 @@ struct PreampStage {
  double k=bypass?fixedCath:0.;
  double u=std::max(0.,1.125+grid-k+2+(supply-k-250)/100);
  double a=K*(s.rp/100+(bypass?0.:s.rk*1.01));
- double cur=eco?std::clamp(K*triodeLoad.get(u,a),lo,hi):std::clamp(lastCurrent,lo,hi);
+ double cur=std::clamp(lastCurrent,lo,hi);
+ if(eco && std::abs(residual(cur))>2e-5)cur=std::clamp(K*triodeLoad.get(u,a),lo,hi);
  for(int n=0;n<24;++n){
- double f=residual(cur);if(std::abs(f)<1e-10)break;
+ double f=residual(cur);if(std::abs(f)<(eco?1e-8:1e-10))break;
  if(f>0)lo=cur;else hi=cur;
  double k=bypass?fixedCath:cur*s.rk;
  double vp=supply-cur*s.rp-k;
@@ -103,7 +104,24 @@ struct PreampStage {
  const double node=(rhs+link*vg+gp*peak)/den;
  coupling=in-node;peak=node-vg;
  double i=solve(vg,cath,s.ck>0);
- if(s.ck>0){
+ if(s.ck>0 && eco){
+ // Eliminate the implicit capacitor unknown analytically: cath = base + effectiveR * current.
+ const double h=dt/s.ck, den=1+h/s.rk, base=cath/den, effectiveR=h/den;
+ const double R=s.rp+effectiveR;
+ constexpr double K=.0012/(1.125*1.0606601717798212);
+ const double u=1.125+vg-base+2+(supply-base-250)/100;
+ const double slopeU=s.rp/100+1.01*effectiveR;
+ double lo=0,hi=std::max(0.,(supply-base)/R);i=std::clamp(i,lo,hi);
+ for(int n=0;n<24;++n){
+ double vp=supply-base-R*i,w=std::max(0.,u-slopeU*i),root=std::sqrt(w),knee=std::clamp(vp/10.,0.,1.);
+ double f=K*w*root*knee-i;if(std::abs(f)<1e-8)break;
+ if(f>0)lo=i;else hi=i;
+ double derivative=1+1.5*K*root*slopeU*knee;
+ if(vp>0&&vp<10)derivative+=K*w*root*R/10.;
+ double trial=i+f/derivative;i=(trial>lo&&trial<hi)?trial:(lo+hi)*.5;
+ }
+ cath=base+effectiveR*i;lastCurrent=i;
+ }else if(s.ck>0){
  // Implicit cathode capacitor update; monotonic current decreases with cathode voltage.
  double h=dt/s.ck, old=cath, lo=0,hi=std::max(old,supply);
  double next=std::clamp((old+h*i)/(1+h/s.rk),lo,hi);
