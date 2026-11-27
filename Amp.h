@@ -51,12 +51,12 @@ struct Engine {
  double biasFor(TubeData t,double v,double s){double lo=-200,hi=0;double target=std::min(t.idle,.65*t.rating/std::max(1.,v));for(int i=0;i<32;++i){double m=(lo+hi)*.5;if(plate(t,v,m,s)>target)hi=m;else lo=m;}return (lo+hi)*.5;}
  double step(double x){auto m=selectedPower();if(m!=activePower){circuit=powerCircuit(m);activePower=m;reset();}auto &q=circuit;auto chosen=controls.autoTube?(m==PowerModel::EVH&&controls.evhVoice==EVHVoice::BlueEL34?Tube::EL34:nativeTube(m)):controls.tube;auto t=data(chosen);auto ps=inverterSpec(m);bool cathodeBias=m==PowerModel::AC30;double target=q.B*(controls.spongy?.85:1.)-(controls.tubeRect?20:0);if(!ready||active!=chosen){bias=biasFor(t,target,q.screen*target/q.B);cathodeV=cathodeBias?-bias:0;grid1.charge=cathodeBias?0:-bias;grid2.charge=grid1.charge;active=chosen;ready=true;}
  // 0 dBu = .775 Vrms; -14 dBFS sine = .1995 peak.
- double v=x*(.775*std::sqrt(2.)/std::pow(10.,-14./20.));
+ double v=x*5.493063;
  v=preamp.process(v,supply*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco)*controls.master;
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
  double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*std::sqrt(q.feedbackTap/q.load),dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC);
- double d1,d2;pi.process(clamp(v,-30.,30.),feedback,supply*.72,dt,d1,d2,ps,controls.eco);
+ double d1,d2;pi.process(clamp(v,-30.,30.),feedback,supply*.72,dt,d1,d2,ps,false);
  if(m==PowerModel::AC30){double diff=d1-d2;double r=1000.+250000.*(1-controls.presence);double sourceR=100000.;double a=dt/4.7e-9;double i=(diff-cutState)/(r+sourceR+a);cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
  if(m==PowerModel::RectoModern){double diff=d1-d2;double high=diff-lp(diff,modernState,2200,dt);double atten=.65*(1-controls.presence)*high;d1-=atten*.5;d2+=atten*.5;}
  double g1=grid1.process(d1,cathodeBias?0:bias,dt,ps)-cathodeV,g2=grid2.process(d2,cathodeBias?0:bias,dt,ps)-cathodeV;
@@ -68,37 +68,13 @@ struct Engine {
  double lo=-2*supply,hi=2*supply;
  auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);return ((a.ip-b.ip)*q.pairs*.5-magI)*q.primary-v;};
  double primaryV=0;
- if(controls.eco){
- double fl=residual(lo),fh=residual(hi);
- for(int k=0;k<8;++k){
- double v=std::clamp(lo-fl*(hi-lo)/(fl-fh),lo+.05*(hi-lo),hi-.05*(hi-lo));
- if(!std::isfinite(v))v=(lo+hi)*.5;
- double f=residual(v);primaryV=v;
- if(std::abs(f)<.02)break;
- if(f>0){lo=v;fl=f;fh*=.5;}else{hi=v;fh=f;fl*=.5;}
- }
- }else{
- for(int k=0;k<16;++k){double v=(lo+hi)*.5;if(residual(v)>0)lo=v;else hi=v;}
- primaryV=(lo+hi)*.5;
- }auto a1=branch(supply-primaryV*.5,g1),a2=branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
+ for(int k=0;k<16;++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.002){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
+ primaryV=(lo+hi)*.5;auto a1=branch(supply-primaryV*.5,g1),a2=branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
  double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double rk=47.;double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/(1+dt/(rk*ck)),0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
  double r=q.supplyR+(controls.tubeRect?65:0);
- if(controls.eco){
- sagCurrentSum+=current;sagScreenSum+=screens;++sagCount;
- const int stride=std::max(1,int(1./(12000.*dt)));
- if(sagCount>=stride){
- double h=dt*sagCount, avg=sagCurrentSum/sagCount, avgScreen=sagScreenSum/sagCount;
- double equilibrium=target-r*avg;
- supply=clamp(equilibrium+(supply-equilibrium)*std::exp(-h/(r*q.reservoir)),target*.45,target);
- screen=lp(clamp(supply-(q.B-q.screen)-avgScreen*100,30.,supply),screen,35,h);
- sagCurrentSum=sagScreenSum=0;sagCount=0;
- }
- }else{
- sagCurrentSum=sagScreenSum=0;sagCount=0;
  double recharge=std::max(0.,(target-supply)/r);supply=clamp(supply+dt*(recharge-current)/q.reservoir,target*.45,target);
  screen=lp(clamp(supply-(q.B-q.screen)-screens*100,30.,supply),screen,35,dt);
- }
  // Reduced-order transformer: flux state and smooth core compression.
  double emf=primaryV;magI+=dt*(emf-magI*100)/q.transformerL;flux+=dt*(emf-flux*35);double sat=1/std::sqrt(1+(flux/q.fluxLimit)*(flux/q.fluxLimit));double source=clamp(emf*sat/ratio,-100.,100.);
  // Passive series coil and parallel motional RLC, backward Euler companion solution.
