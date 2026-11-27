@@ -113,7 +113,11 @@ struct Preamp {
  }
 
  // Reduced cathode follower: unity-ish gain with asymmetric headroom, DC removed.
- double follower=v; if(!(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)){double lo=0,hi=supply;for(int j=0;j<(eco?7:10);++j){double k=(lo+hi)*.5; if(triodeCurrent(supply-k,v-k)>k/100000.)lo=k;else hi=k;} follower=(lo+hi)*.5;}if(followerDC==0)followerDC=follower;followerDC+=dt/(.02+dt)*(follower-followerDC);v=(follower-followerDC); if(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)v=(follower-followerDC);
+ double follower=v; if(!(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)){if(eco){
+ constexpr double K=.0012/(1.125*1.0606601717798212);
+ double u=std::max(0.,1.125+v+2+(supply-250)/100);
+ follower=std::min(supply,100000.*K*triodeLoad.get(u,K*101000.));
+ }else{double lo=0,hi=supply;for(int j=0;j<10;++j){double k=(lo+hi)*.5; if(triodeCurrent(supply-k,v-k)>k/100000.)lo=k;else hi=k;} follower=(lo+hi)*.5;}}if(followerDC==0)followerDC=follower;followerDC+=dt/(.02+dt)*(follower-followerDC);v=(follower-followerDC); if(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)v=(follower-followerDC);
  if(model==PreampModel::Jose && arch!=JoseArchitecture::Stock)v=jose.process(v,dt,era);
  return tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.);
  }
