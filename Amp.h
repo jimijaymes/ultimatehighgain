@@ -31,7 +31,7 @@ case PowerModel::AC50: q.B=440;q.screen=420;q.primary=3400;q.pairs=1;q.feedbackR
 case PowerModel::SLO: q.B=500;q.screen=480;q.primary=1900;q.feedbackR=39000;q.reservoir=100e-6;q.supplyR=35;break;
 default: break;}return q;}
 inline Tube nativeTube(PowerModel m){switch(m){case PowerModel::AC30:case PowerModel::MiniRecto:return Tube::EL84;case PowerModel::Peavey:case PowerModel::RectoVintage:case PowerModel::RectoModern:case PowerModel::VHT:case PowerModel::EVH:case PowerModel::SLO:return Tube::L6;default:return Tube::EL34;}}
-inline PhaseInverterSpec inverterSpec(PowerModel m){PhaseInverterSpec p;switch(m){case PowerModel::RectoVintage:case PowerModel::RectoModern:p.coupling=100e-9;p.gridStop=1500;break;case PowerModel::AC30:p.plate1=100000;p.plate2=100000;p.tail=48000;p.coupling=100e-9;break;case PowerModel::MiniRecto:case PowerModel::Peavey:case PowerModel::EVH:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::VHT:case PowerModel::SLO:p.coupling=100e-9;p.gridStop=2200;break;default:break;}return p;}
+inline PhaseInverterSpec inverterSpec(PowerModel m){PhaseInverterSpec p;switch(m){case PowerModel::RectoVintage:case PowerModel::RectoModern:p.coupling=100e-9;p.gridStop=1500;break;case PowerModel::AC30:p.plate1=100000;p.plate2=100000;p.tail=48200;p.biasR=1200;p.coupling=150e-9;p.gridStop=1500;break;case PowerModel::MiniRecto:case PowerModel::Peavey:case PowerModel::EVH:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::VHT:case PowerModel::SLO:p.coupling=100e-9;p.gridStop=2200;break;default:break;}return p;}
 struct Controls {bool autoTube=true;bool linkPower=true; PowerModel power=PowerModel::Marshall;double presence=.5, gain=.5, master=.25, bass=.5, mid=.5, treble=.5; bool spongy=false,tubeRect=false; Tube tube=Tube::EL34; PreampModel preamp=PreampModel::Marshall; JoseEra joseEra=JoseEra::Zener20; bool joseExtraStage=true; double joseGain2=.7; JoseArchitecture joseArchitecture=JoseArchitecture::Legacy; ColdBias joseBias=ColdBias::Native; CathodeBypass joseBypass=CathodeBypass::Native; ColdBias coldBias=ColdBias::Native; CathodeBypass coldBypass=CathodeBypass::Native; RectoVoice rectoVoice=RectoVoice::EarlyRed; EVHVoice evhVoice=EVHVoice::Blue;};
 struct Triode {
  double cap=0, blocking=0;
@@ -43,11 +43,11 @@ struct Triode {
  }
 };
 struct Engine {
- Circuit circuit; Controls controls; double fs=48000,dt=1./192000; Preamp preamp; PhaseInverter pi; GridCoupling grid1,grid2; double magI=0; PresenceNetwork presenceNet; double supply=450, screen=440,bias=-40, fb=0,fbLow=0,flux=0,leak=0,capV=0,indI=0,coilI=0, bassZ=0,trebleZ=0, prev=0,gridBlock=0; double peakPlate=0,cathodeV=0; Tube active=Tube::EL34; bool ready=false; PowerModel activePower=PowerModel::Marshall;
+ Circuit circuit; Controls controls; double fs=48000,dt=1./192000; Preamp preamp; PhaseInverter pi; GridCoupling grid1,grid2; double magI=0; PresenceNetwork presenceNet; double supply=450, screen=440,bias=-40, fb=0,fbLow=0,flux=0,leak=0,capV=0,indI=0,coilI=0, bassZ=0,trebleZ=0, prev=0,gridBlock=0; double peakPlate=0,cathodeV=0,cutState=0,modernState=0; Tube active=Tube::EL34; bool ready=false; PowerModel activePower=PowerModel::Marshall;
  PowerModel selectedPower() const {if(!controls.linkPower)return controls.power; switch(controls.preamp){case PreampModel::Peavey5150:return PowerModel::Peavey;case PreampModel::DualRectifier:return controls.rectoVoice==RectoVoice::EarlyOrange?PowerModel::RectoVintage:PowerModel::RectoModern;case PreampModel::VHT:return PowerModel::VHT;case PreampModel::EVH5150III:return PowerModel::EVH;default:return PowerModel::Marshall;}}
 
  void prepare(double rate){fs=rate;dt=1/(4*fs);reset();}
- void reset(){preamp={};pi={};grid1={};grid2={};magI=0;presenceNet={};supply=circuit.B;screen=circuit.screen;fb=fbLow=flux=leak=capV=indI=coilI=bassZ=trebleZ=prev=gridBlock=peakPlate=0;active=controls.tube;cathodeV=0;ready=false;}
+ void reset(){preamp={};pi={};grid1={};grid2={};magI=0;presenceNet={};supply=circuit.B;screen=circuit.screen;fb=fbLow=flux=leak=capV=indI=coilI=bassZ=trebleZ=prev=gridBlock=peakPlate=0;active=controls.tube;cathodeV=cutState=modernState=0;ready=false;}
  double biasFor(TubeData t,double v,double s){double lo=-200,hi=0;double target=std::min(t.idle,.65*t.rating/std::max(1.,v));for(int i=0;i<32;++i){double m=(lo+hi)*.5;if(plate(t,v,m,s)>target)hi=m;else lo=m;}return (lo+hi)*.5;}
  double step(double x){auto m=selectedPower();if(m!=activePower){circuit=powerCircuit(m);activePower=m;reset();}auto &q=circuit;auto chosen=controls.autoTube?(m==PowerModel::EVH&&controls.evhVoice==EVHVoice::BlueEL34?Tube::EL34:nativeTube(m)):controls.tube;auto t=data(chosen);auto ps=inverterSpec(m);bool cathodeBias=m==PowerModel::AC30;double target=q.B*(controls.spongy?.85:1.)-(controls.tubeRect?20:0);if(!ready||active!=chosen){bias=biasFor(t,target,q.screen*target/q.B);cathodeV=cathodeBias?-bias:0;grid1.charge=cathodeBias?0:-bias;grid2.charge=grid1.charge;active=chosen;ready=true;}
  // 0 dBu = .775 Vrms; -14 dBFS sine = .1995 peak.
@@ -56,6 +56,8 @@ struct Engine {
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
  double feedback=(activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*std::sqrt(q.feedbackTap/q.load),dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC);
  double d1,d2;pi.process(clamp(v,-30.,30.),feedback,supply*.72,dt,d1,d2,ps);
+ if(m==PowerModel::AC30){double diff=d1-d2;double r=1000.+250000.*(1-controls.presence);double sourceR=100000.;double a=dt/4.7e-9;double i=(diff-cutState)/(r+sourceR+a);cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
+ if(m==PowerModel::RectoModern){double diff=d1-d2;double high=diff-lp(diff,modernState,2200,dt);double atten=.65*(1-controls.presence)*high;d1-=atten*.5;d2+=atten*.5;}
  double g1=grid1.process(d1,cathodeBias?0:bias,dt,ps)-cathodeV,g2=grid2.process(d2,cathodeBias?0:bias,dt,ps)-cathodeV;
  double ratio=std::sqrt(q.primary/q.load);
  // Solve plate/screen current against the same instantaneous reflected voltage.
@@ -66,7 +68,7 @@ struct Engine {
  for(int k=0;k<10;k++){double v=(lo+hi)*.5;auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);double predicted=((a.ip-b.ip)*q.pairs*.5-magI)*q.primary;if(predicted>v)lo=v;else hi=v;}
  double primaryV=(lo+hi)*.5;auto a1=branch(supply-primaryV*.5,g1),a2=branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
- double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double rk=50.;double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/(1+dt/(rk*ck)),0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
+ double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double rk=47.;double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/(1+dt/(rk*ck)),0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
  double r=q.supplyR+(controls.tubeRect?65:0);double recharge=std::max(0.,(target-supply)/r);supply=clamp(supply+dt*(recharge-current)/q.reservoir,target*.45,target);
  screen=lp(clamp(supply-(q.B-q.screen)-screens*100,30.,supply),screen,35,dt);
  // Reduced-order transformer: flux state and smooth core compression.
