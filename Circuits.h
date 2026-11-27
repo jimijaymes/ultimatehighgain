@@ -23,9 +23,9 @@ struct ToneStack {
 struct PhaseInverterSpec {double plate1=82000,plate2=100000,tail=10470,biasR=470,coupling=22e-9,gridLeak=220000,gridStop=5600;};
 struct PhaseInverter {
  double dc1=0,dc2=0; bool initialized=false;
- static double current(double grid,double cath,double supply,double r){double lo=0,hi=supply/r;for(int k=0;k<16;k++){double i=(lo+hi)*.5;double p=supply-i*r;double m=triodeCurrent(p-cath,grid-cath);if(m>i)lo=i;else hi=i;}return (lo+hi)*.5;}
+ static double current(double grid,double cath,double supply,double r){double lo=0,hi=supply/r;double i=0;for(int k=0;k<6;k++){double p=supply-i*r;double m=triodeCurrent(p-cath,grid-cath);double slope=(triodeCurrent(p-cath+.1,grid-cath)-m)*10.;double next=std::clamp(i+(m-i)/(1+r*std::max(0.,slope)),lo,hi);i=next;}return i;}
  void process(double input,double feedback,double supply,double dt,double &o1,double &o2,PhaseInverterSpec spec={}){
- double lo=0,hi=supply*.5;double i1=0,i2=0;for(int k=0;k<17;k++){double cath=(lo+hi)*.5;double gridDC=cath*(1-spec.biasR/spec.tail);i1=current(input+gridDC,cath,supply,spec.plate1);i2=current(feedback+gridDC,cath,supply,spec.plate2);if((i1+i2)*spec.tail>cath)lo=cath;else hi=cath;}
+ double lo=0,hi=supply*.5;double i1=0,i2=0;for(int k=0;k<10;k++){double cath=(lo+hi)*.5;double gridDC=cath*(1-spec.biasR/spec.tail);i1=current(input+gridDC,cath,supply,spec.plate1);i2=current(feedback+gridDC,cath,supply,spec.plate2);if((i1+i2)*spec.tail>cath)lo=cath;else hi=cath;}
  double p1=supply-i1*spec.plate1,p2=supply-i2*spec.plate2;if(!initialized){dc1=p1;dc2=p2;initialized=true;}double alpha=1-std::exp(-6.283185307*2*dt);dc1+=alpha*(p1-dc1);dc2+=alpha*(p2-dc2);o1=dc1-p1;o2=dc2-p2;
  }
 };
