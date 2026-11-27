@@ -43,10 +43,10 @@ struct Triode {
  }
 };
 struct Engine {
- Circuit circuit; Controls controls; double fs=48000,dt=1./192000; Preamp preamp; PhaseInverter pi; GridCoupling grid1,grid2; double magI=0; PresenceNetwork presenceNet; double supply=450, screen=440,bias=-40, fb=0,fbLow=0,flux=0,leak=0,capV=0,indI=0,coilI=0, bassZ=0,trebleZ=0, prev=0,gridBlock=0; double peakPlate=0,cathodeV=0,cutState=0,modernState=0; Tube active=Tube::EL34; bool ready=false; PowerModel activePower=PowerModel::Marshall;
+ Circuit circuit; Controls controls; int oversampling=1; double fs=48000,dt=1./48000; Preamp preamp; PhaseInverter pi; GridCoupling grid1,grid2; double magI=0; PresenceNetwork presenceNet; double supply=450, screen=440,bias=-40, fb=0,fbLow=0,flux=0,leak=0,capV=0,indI=0,coilI=0, bassZ=0,trebleZ=0, prev=0,gridBlock=0; double peakPlate=0,cathodeV=0,cutState=0,modernState=0; Tube active=Tube::EL34; bool ready=false; PowerModel activePower=PowerModel::Marshall;
  PowerModel selectedPower() const {if(!controls.linkPower)return controls.power; switch(controls.preamp){case PreampModel::Peavey5150:return PowerModel::Peavey;case PreampModel::DualRectifier:return controls.rectoVoice==RectoVoice::EarlyOrange?PowerModel::RectoVintage:PowerModel::RectoModern;case PreampModel::VHT:return PowerModel::VHT;case PreampModel::EVH5150III:return PowerModel::EVH;default:return PowerModel::Marshall;}}
 
- void prepare(double rate){fs=rate;dt=1/(4*fs);reset();}
+ void prepare(double rate){fs=rate;dt=1/(oversampling*fs);reset();}
  void reset(){preamp={};pi={};grid1={};grid2={};magI=0;presenceNet={};supply=circuit.B;screen=circuit.screen;fb=fbLow=flux=leak=capV=indI=coilI=bassZ=trebleZ=prev=gridBlock=peakPlate=0;active=controls.tube;cathodeV=cutState=modernState=0;ready=false;}
  double biasFor(TubeData t,double v,double s){double lo=-200,hi=0;double target=std::min(t.idle,.65*t.rating/std::max(1.,v));for(int i=0;i<32;++i){double m=(lo+hi)*.5;if(plate(t,v,m,s)>target)hi=m;else lo=m;}return (lo+hi)*.5;}
  double step(double x){auto m=selectedPower();if(m!=activePower){circuit=powerCircuit(m);activePower=m;reset();}auto &q=circuit;auto chosen=controls.autoTube?(m==PowerModel::EVH&&controls.evhVoice==EVHVoice::BlueEL34?Tube::EL34:nativeTube(m)):controls.tube;auto t=data(chosen);auto ps=inverterSpec(m);bool cathodeBias=m==PowerModel::AC30;double target=q.B*(controls.spongy?.85:1.)-(controls.tubeRect?20:0);if(!ready||active!=chosen){bias=biasFor(t,target,q.screen*target/q.B);cathodeV=cathodeBias?-bias:0;grid1.charge=cathodeBias?0:-bias;grid2.charge=grid1.charge;active=chosen;ready=true;}
@@ -62,11 +62,11 @@ struct Engine {
  double ratio=std::sqrt(q.primary/q.load);
  // Solve plate/screen current against the same instantaneous reflected voltage.
  struct Branch {double ip,is;};
- auto branch=[&](double vp,double vg){double lo=0,hi=screen;for(int k=0;k<6;k++){double vs=(lo+hi)*.5;if(vs+screenCurrent(t,vp,vg,vs)*q.screenR>screen)hi=vs;else lo=vs;}double vs=(lo+hi)*.5;return Branch{plate(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV)),screenCurrent(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV))};};
+ auto branch=[&](double vp,double vg){double lo=0,hi=screen;for(int k=0;k<4;k++){double vs=(lo+hi)*.5;if(vs+screenCurrent(t,vp,vg,vs)*q.screenR>screen)hi=vs;else lo=vs;}double vs=(lo+hi)*.5;return Branch{plate(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV)),screenCurrent(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV))};};
  // Implicit quasi-static primary load line; speaker dynamic state remains explicit.
  double lo=-2*supply,hi=2*supply;
- for(int k=0;k<10;k++){double v=(lo+hi)*.5;auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);double predicted=((a.ip-b.ip)*q.pairs*.5-magI)*q.primary;if(predicted>v)lo=v;else hi=v;}
- double primaryV=(lo+hi)*.5;auto a1=branch(supply-primaryV*.5,g1),a2=branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
+ for(int k=0;k<12;k++){double v=(lo+hi)*.5;auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);double predicted=((a.ip-b.ip)*q.pairs*.5-magI)*q.primary;if(predicted>v)lo=v;else hi=v;}
+ double primaryV=(lo<=0&&hi>=0)?0:(lo+hi)*.5;auto a1=branch(supply-primaryV*.5,g1),a2=branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
  double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double rk=47.;double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/(1+dt/(rk*ck)),0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
  double r=q.supplyR+(controls.tubeRect?65:0);double recharge=std::max(0.,(target-supply)/r);supply=clamp(supply+dt*(recharge-current)/q.reservoir,target*.45,target);
@@ -77,6 +77,6 @@ struct Engine {
  double R=q.load*.75, L=.00045+q.leakage/(ratio*ratio), Rm=q.load*4,Lm=.018,Cm=1/(std::pow(6.283185307*95,2)*Lm);
  double G=1/Rm+dt/Lm+Cm/dt;double history=Cm/dt*capV-indI;double rs=q.load*.12;double nextI=(source+L/dt*coilI-history/G)/(R+rs+L/dt+1/G);capV=(nextI+history)/G;indI+=dt*capV/Lm;coilI=nextI;fb=source-rs*coilI;return fb/40.;
  }
- double process(double x){double out=0;for(int j=1;j<=4;++j)out+=step(prev+(x-prev)*j/4.);prev=x;return out*.25;}
+ double process(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j){double y=step(prev+(x-prev)*j/oversampling);if(!std::isfinite(y)){reset();return 0;}out+=y;}prev=x;return std::clamp(out/oversampling,-1.,1.);}
 };
 }
