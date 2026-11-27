@@ -32,35 +32,38 @@ struct ToneStack {
 struct PhaseInverterSpec {double plate1=82000,plate2=100000,tail=10470,biasR=470,coupling=22e-9,gridLeak=220000,gridStop=5600;};
 struct PhaseInverter {
  double dc1=0,dc2=0; bool initialized=false;
- static double current(double grid,double cath,double supply,double r){double lo=0,hi=supply/r;double i=0;for(int k=0;k<6;k++){double p=supply-i*r;double m=triodeCurrent(p-cath,grid-cath);double slope=(triodeCurrent(p-cath+.1,grid-cath)-m)*10.;double next=std::clamp(i+(m-i)/(1+r*std::max(0.,slope)),lo,hi);i=next;}return i;}
- // The resistive triode load line depends on effective grid drive and available plate supply.
- static double lookupCurrent(double grid,double cath,double supply,double r){
-  // Analytic inverse approximation of I = K*(u - I*r/100)^1.5.
-  // Solve in sqrt(overdrive) using two bounded Newton steps, no nested current loop.
-  double available=std::max(0.,supply-cath);
-  double u=std::max(0.,1.125+grid-cath+2+(available-250)/100);
-  constexpr double K=.0012/(1.125*1.0606601717798212);
-  double a=K*r/100.; return std::min(available/r,K*triodeLoad.get(u,a));
+ static double current(double grid,double cath,double supply,double r){
+ double available=std::max(0.,supply-cath);
+ constexpr double K=.0012/(1.125*1.0606601717798212);
+ double u=std::max(0.,1.125+grid-cath+2+(available-250)/100);
+ double lo=0,hi=available/r;
+ double i=std::clamp(K*triodeLoad.get(u,K*r/100.),lo,hi);
+ for(int k=0;k<20;++k){
+ double vp=available-i*r, w=std::max(0.,u-i*r/100.);
+ double knee=std::clamp(vp/10.,0.,1.);
+ double f=K*w*std::sqrt(w)*knee-i;
+ if(std::abs(f)<1e-10)return i;
+ if(f>0)lo=i;else hi=i;
+ double slope=1+1.5*K*std::sqrt(w)*r/100.*knee;
+ if(vp>0&&vp<10)slope+=K*w*std::sqrt(w)*r/10.;
+ double next=i+f/slope;i=(next>lo&&next<hi)?next:(lo+hi)*.5;
+ }
+ return i;
  }
  double tailEstimate=0;
  void process(double input,double feedback,double supply,double dt,double &o1,double &o2,PhaseInverterSpec spec={},bool eco=false){
- double lo=0,hi=supply*.5;double i1=0,i2=0;
- if(eco){
-  double cath=initialized?std::clamp(tailEstimate,lo,hi):supply*.03;
-  for(int k=0;k<3;++k){
-   double gridDC=cath*(1-spec.biasR/spec.tail);
-   i1=lookupCurrent(input+gridDC,cath,supply,spec.plate1);
-   i2=lookupCurrent(feedback+gridDC,cath,supply,spec.plate2);
-   double err=(i1+i2)*spec.tail-cath;
-   if(std::abs(err)<.001)break;
-   if(err>0)lo=cath;else hi=cath;
-   double next=cath+err*.65;
-   cath=(next>lo&&next<hi)?next:(lo+hi)*.5;
-  }
-  tailEstimate=cath;
- }else{
- for(int k=0;k<10;k++){double cath=(lo+hi)*.5;double gridDC=cath*(1-spec.biasR/spec.tail);i1=current(input+gridDC,cath,supply,spec.plate1);i2=current(feedback+gridDC,cath,supply,spec.plate2);if((i1+i2)*spec.tail>cath)lo=cath;else hi=cath;}
+ double lo=0,hi=supply;double i1=0,i2=0;
+ double cath=initialized?std::clamp(tailEstimate,lo,hi):supply*.03;
+ for(int k=0;k<20;++k){
+ double gridDC=cath*(1-spec.biasR/spec.tail);
+ i1=current(input+gridDC,cath,supply,spec.plate1);
+ i2=current(feedback+gridDC,cath,supply,spec.plate2);
+ double f=(i1+i2)*spec.tail-cath;
+ if(std::abs(f)<1e-5)break;
+ if(f>0)lo=cath;else hi=cath;
+ cath=(lo+hi)*.5;
  }
+ tailEstimate=cath;
  double p1=supply-i1*spec.plate1,p2=supply-i2*spec.plate2;if(!initialized){dc1=p1;dc2=p2;initialized=true;}double alpha=1-std::exp(-6.283185307*2*dt);dc1+=alpha*(p1-dc1);dc2+=alpha*(p2-dc2);o1=dc1-p1;o2=dc2-p2;
  }
 };
