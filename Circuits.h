@@ -3,10 +3,12 @@
 #include <algorithm>
 #include "Tubes.h"
 namespace uhg {
+// Backward Euler nodal passive tone stack: slope resistor, three capacitors,
+// bass rheostat, mid rheostat, treble potentiometer and master input load.
 struct ToneStack {
  double history[3]{};
  double process(double in,double dt,double bass,double mid,double treble,double slope=33000,double ct=470e-12,double cb=22e-9,double cm=22e-9,double sourceR=0){
- double a[6][7]{};
+ double a[6][7]{}; // slope, treble top, bass top, lower stack, wiper
  auto stamp=[&](int i,int j,double g,double h=0.){if(i>=0){a[i][i]+=g;a[i][6]+=h;}if(j>=0){a[j][j]+=g;a[j][6]-=h;}if(i>=0&&j>=0){a[i][j]-=g;a[j][i]-=g;}};
  auto cap=[&](int i,int j,double c,int k,double source=0.){double g=c/dt;stamp(i,j,g,g*(history[k]+source));};
  stamp(0,5,1./slope);stamp(5,-1,1./std::max(1.,sourceR),in/std::max(1.,sourceR));
@@ -17,6 +19,7 @@ struct ToneStack {
  history[0]=a[1][6]-a[5][6];history[1]=a[0][6]-a[2][6];history[2]=a[0][6]-a[3][6];return a[4][6];
  }
 };
+// Reduced-order shared-tail nonlinear LTP, DC operating point removed.
 struct PhaseInverter {
  double dc1=0,dc2=0; bool initialized=false;
  static double current(double grid,double cath,double supply,double r){double lo=0,hi=supply/r;for(int k=0;k<16;k++){double i=(lo+hi)*.5;double p=supply-i*r;double m=triodeCurrent(p-cath,grid-cath);if(m>i)lo=i;else hi=i;}return (lo+hi)*.5;}
