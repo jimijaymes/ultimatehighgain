@@ -66,8 +66,8 @@ struct Engine {
  auto branch=[&](double vp,double vg){double vs=std::clamp(screen-screenCurrent(t,vp,vg,screen)*q.screenR,0.,screen);return Branch{plate(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV)),screenCurrent(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV))};};
  // Implicit quasi-static primary load line; speaker dynamic state remains explicit.
  double lo=-2*supply,hi=2*supply;
- for(int k=0;k<(controls.eco?12:8);k++){double v=(lo+hi)*.5;auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);double predicted=((a.ip-b.ip)*q.pairs*.5-magI)*q.primary;if(predicted>v)lo=v;else hi=v;}
- double primaryV=controls.eco?(lo+hi)*.5:((lo<=0&&hi>=0)?0:(lo+hi)*.5);auto a1=branch(supply-primaryV*.5,g1),a2=branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
+ for(int k=0;k<(controls.eco?12:16);k++){double v=(lo+hi)*.5;auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);double predicted=((a.ip-b.ip)*q.pairs*.5-magI)*q.primary;if(predicted>v)lo=v;else hi=v;}
+ double primaryV=(lo+hi)*.5;auto a1=branch(supply-primaryV*.5,g1),a2=branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
  double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double rk=47.;double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/(1+dt/(rk*ck)),0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
  double r=q.supplyR+(controls.tubeRect?65:0);
