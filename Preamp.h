@@ -72,7 +72,25 @@ struct PreampStage {
  const double rs=std::max(1.,sourceR+series+top);
  const double cp=s.peakC+bright;
  if(!init){coupling=in;peak=0;}
- auto solve=[&](double grid,double fixedCath,bool bypass){double lo=0,hi=supply/s.rp;double cur=std::clamp(lastCurrent,lo,hi);for(int i=0;i<5;++i){double k=bypass?fixedCath:cur*s.rk;double vp=supply-cur*s.rp-k,vg=grid-k;double ip=triodeCurrent(vp,vg);double u=std::max(0.,1.125+vg+2+(vp-250)/100);double slope=.0016*std::sqrt(u/1.125)*(s.rp/100+(bypass?0:s.rk*1.01));double err=ip-cur;if(std::abs(err)<1e-8)break;if(err>0)lo=cur;else hi=cur;double next=cur+err/(1+slope);cur=(next>lo&&next<hi)?next:(lo+hi)*.5;}lastCurrent=cur;return cur;};
+ auto solve=[&](double grid,double fixedCath,bool bypass){
+ double lo=0,hi=std::max(0.,(supply-(bypass?fixedCath:0.))/(s.rp+(bypass?0.:s.rk)));
+ auto residual=[&](double cur){double k=bypass?fixedCath:cur*s.rk;return triodeCurrent(supply-cur*s.rp-k,grid-k)-cur;};
+ constexpr double K=.0012/(1.125*1.0606601717798212);
+ double k=bypass?fixedCath:0.;
+ double u=std::max(0.,1.125+grid-k+2+(supply-k-250)/100);
+ double a=K*(s.rp/100+(bypass?0.:s.rk*1.01));
+ double cur=eco?std::clamp(K*triodeLoad.get(u,a),lo,hi):std::clamp(lastCurrent,lo,hi);
+ for(int n=0;n<24;++n){
+ double f=residual(cur);if(std::abs(f)<1e-10)break;
+ if(f>0)lo=cur;else hi=cur;
+ double k=bypass?fixedCath:cur*s.rk;
+ double vp=supply-cur*s.rp-k;
+ double u=std::max(0.,1.125+grid-k+2+(vp-250)/100);
+ double slope=1.5*K*std::sqrt(u)*(s.rp/100+(bypass?0.:s.rk*1.01))*std::clamp(vp/10.,0.,1.);
+ if(vp>0&&vp<10)slope+=K*u*std::sqrt(u)*(s.rp+(bypass?0.:s.rk))/10.;
+ double next=cur+f/(1+slope);cur=(next>lo&&next<hi)?next:(lo+hi)*.5;
+ }
+ lastCurrent=cur;return cur;};
  if(!init){cath=solve(0,0,false)*s.rk;init=true;}
  const double gc=s.cc/dt, gp=cp/dt, gr=1./rs, gl=1./s.rg+1./bottom, gd=1./68000., threshold=cath+.5;
  // Two-node companion model, capacitor across series resistance.
@@ -84,15 +102,20 @@ struct PreampStage {
  if(vg>threshold)vg=(drive+gd*threshold)/(effective+gl+gd);
  const double node=(rhs+link*vg+gp*peak)/den;
  coupling=in-node;peak=node-vg;
- double i;
- if(eco){
- double k=s.ck>0?cath:0.;
- double u=std::max(0.,1.125+vg-k+2+(supply-k-250)/100);
- constexpr double K=.0012/(1.125*1.0606601717798212);
- double a=K*(s.rp/100+(s.ck>0?0.:s.rk*1.01));
- i=std::min(supply/(s.rp+(s.ck>0?0.:s.rk)),K*triodeLoad.get(u,a));
- }else i=solve(vg,cath,s.ck>0);
- if(s.ck>0)cath+=(i*s.rk-cath)*(-std::expm1(-dt/(s.rk*s.ck)));else cath=i*s.rk;
+ double i=solve(vg,cath,s.ck>0);
+ if(s.ck>0){
+ // Implicit cathode capacitor update; monotonic current decreases with cathode voltage.
+ double h=dt/s.ck, old=cath, lo=0,hi=std::max(old,supply);
+ double next=std::clamp((old+h*i)/(1+h/s.rk),lo,hi);
+ for(int n=0;n<16;++n){
+ i=solve(vg,next,true);double f=old+h*i-next*(1+h/s.rk);
+ if(std::abs(f)<1e-7)break;
+ if(f>0)lo=next;else hi=next;
+ double trial=(old+h*i)/(1+h/s.rk);
+ next=(trial>lo&&trial<hi)?trial:(lo+hi)*.5;
+ }
+ cath=next;i=solve(vg,cath,true);
+ }else cath=i*s.rk;
  return supply-i*s.rp;
  }
 };
@@ -117,7 +140,7 @@ struct Preamp {
  constexpr double K=.0012/(1.125*1.0606601717798212);
  double u=std::max(0.,1.125+v+2+(supply-250)/100);
  follower=std::min(supply,100000.*K*triodeLoad.get(u,K*101000.));
- }else{double lo=0,hi=supply;for(int j=0;j<10;++j){double k=(lo+hi)*.5; if(triodeCurrent(supply-k,v-k)>k/100000.)lo=k;else hi=k;} follower=(lo+hi)*.5;}}if(followerDC==0)followerDC=follower;followerDC+=dt/(.02+dt)*(follower-followerDC);v=(follower-followerDC); if(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)v=(follower-followerDC);
+ }else{double lo=0,hi=supply;for(int j=0;j<22;++j){double k=(lo+hi)*.5; if(triodeCurrent(supply-k,v-k)>k/100000.)lo=k;else hi=k;} follower=(lo+hi)*.5;}}if(followerDC==0)followerDC=follower;followerDC+=dt/(.02+dt)*(follower-followerDC);v=(follower-followerDC); if(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)v=(follower-followerDC);
  if(model==PreampModel::Jose && arch!=JoseArchitecture::Stock)v=jose.process(v,dt,era);
  return tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.);
  }
