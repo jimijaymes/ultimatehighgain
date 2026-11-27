@@ -61,7 +61,7 @@ inline PreampSpec evhSpec(EVHVoice voice,ColdBias bias,CathodeBypass bypass){
  return p;
 }
 struct PreampStage {
- double cath=0, coupling=0, peak=0; bool init=false;
+ double cath=0, coupling=0, peak=0, lastCurrent=0; bool init=false;
  double process(double in,double supply,double dt,const StageSpec& s,double pot=1.,double bright=0.,bool usePot=false){
  // Implicit coupling capacitor/grid leak and piecewise grid conduction.
  // Backward-Euler nodal solve: coupling cap, series peaker, pot and grid load.
@@ -72,7 +72,7 @@ struct PreampStage {
  const double rs=std::max(1.,sourceR+series+top);
  const double cp=s.peakC+bright;
  if(!init){coupling=in;peak=0;}
- auto solve=[&](double grid,double fixedCath,bool bypass){double lo=0,hi=supply/s.rp;for(int i=0;i<18;++i){double cur=(lo+hi)*.5;double k=bypass?fixedCath:cur*s.rk;double ip=triodeCurrent(supply-cur*s.rp-k,grid-k);if(ip>cur)lo=cur;else hi=cur;}return (lo+hi)*.5;};
+ auto solve=[&](double grid,double fixedCath,bool bypass){double lo=0,hi=supply/s.rp;double cur=std::clamp(lastCurrent,lo,hi);for(int i=0;i<5;++i){double k=bypass?fixedCath:cur*s.rk;double vp=supply-cur*s.rp-k,vg=grid-k;double ip=triodeCurrent(vp,vg);double u=std::max(0.,1.125+vg+2+(vp-250)/100);double slope=.0016*std::sqrt(u/1.125)*(s.rp/100+(bypass?0:s.rk*1.01));double err=ip-cur;if(std::abs(err)<1e-8)break;if(err>0)lo=cur;else hi=cur;double next=cur+err/(1+slope);cur=(next>lo&&next<hi)?next:(lo+hi)*.5;}lastCurrent=cur;return cur;};
  if(!init){cath=solve(0,0,false)*s.rk;init=true;}
  const double gc=s.cc/dt, gp=cp/dt, gr=1./rs, gl=1./s.rg+1./bottom, gd=1./68000., threshold=cath+.5;
  // Two-node companion model, capacitor across series resistance.
@@ -106,7 +106,7 @@ struct Preamp {
  }
 
  // Reduced cathode follower: unity-ish gain with asymmetric headroom, DC removed.
- double follower=v; if(!(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)){double lo=0,hi=supply;for(int j=0;j<18;++j){double k=(lo+hi)*.5; if(triodeCurrent(supply-k,v-k)>k/100000.)lo=k;else hi=k;} follower=(lo+hi)*.5;}if(followerDC==0)followerDC=follower;followerDC+=dt/(.02+dt)*(follower-followerDC);v=(follower-followerDC); if(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)v=(follower-followerDC);
+ double follower=v; if(!(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)){double lo=0,hi=supply;for(int j=0;j<10;++j){double k=(lo+hi)*.5; if(triodeCurrent(supply-k,v-k)>k/100000.)lo=k;else hi=k;} follower=(lo+hi)*.5;}if(followerDC==0)followerDC=follower;followerDC+=dt/(.02+dt)*(follower-followerDC);v=(follower-followerDC); if(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)v=(follower-followerDC);
  if(model==PreampModel::Jose && arch!=JoseArchitecture::Stock)v=jose.process(v,dt,era);
  return tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.);
  }
