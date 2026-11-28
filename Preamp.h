@@ -22,7 +22,7 @@ inline PreampSpec preampSpec(PreampModel m){
  switch(m){case PreampModel::Marshall:break;
  case PreampModel::Jose:p.count=4;p.stages={a,hot,cold,hot,warm};p.clip=12;break;
  case PreampModel::Peavey5150:p.count=5;p.stages={a,warm,cold,hot,warm};p.stages[2].rk=39000;p.slope=47000;break;
- case PreampModel::DualRectifier:case PreampModel::RectoOrange:case PreampModel::RectoRed:case PreampModel::RectoMulti:p.count=4;p.stages={a,warm,cold,hot,warm};p.stages[2].rk=39000;p.slope=47000;p.ct=500e-12;p.cb=p.cm=47e-9;if(m==PreampModel::RectoMulti)p.stages[1].cc=10e-9;break;
+ case PreampModel::DualRectifier:case PreampModel::RectoOrange:case PreampModel::RectoRed:case PreampModel::RectoMulti:p.count=4;p.stages={a,warm,cold,hot,warm};p.stages[0]={220e3,1800,1e-6,20e-9,1e6,1,0};p.stages[1]={100e3,1800,1e-6,20e-9,1e6,.64,2.082e-9};p.stages[2]={100e3,39000,0,20e-9,1e6,.68,0};p.stages[3]={220e3,1800,1e-6,20e-9,330e3,.60,0};p.slope=47000;p.ct=500e-12;p.cb=p.cm=20e-9;break;
  case PreampModel::VHT:p.count=4;p.stages={a,hot,cold,warm,hot};p.stages[1].cc=4.7e-9;p.stages[2].cc=10e-9;break;
  case PreampModel::EVH5150III:case PreampModel::EVHBlue:p.count=4;p.stages={a,warm,cold,hot,warm};p.stages[1].cc=10e-9;break;
  case PreampModel::EVHRed:p.count=5;p.stages={a,warm,cold,hot,warm};p.stages[1].cc=10e-9;p.stages[3].atten=.18;break;}
@@ -63,7 +63,7 @@ inline PreampSpec evhSpec(EVHVoice voice,ColdBias bias,CathodeBypass bypass){
  return p;
 }
 struct PreampStage {
- double cath=0, coupling=0, peak=0, lastCurrent=0; bool init=false;
+ double cath=0, coupling=0, peak=0, lastCurrent=0, plateFiltered=0; bool init=false;
  std::array<double,7> coeffKey{};bool coeffReady=false;double gc=0,gp=0,gr=0,gl=0,link=0,den=0,effective=0;
  double process(double in,double supply,double dt,const StageSpec& s,double pot=1.,double bright=0.,bool usePot=false,bool eco=false,double volume=1.,bool postEQ=false){
  // Implicit coupling capacitor/grid leak and piecewise grid conduction.
@@ -138,7 +138,7 @@ struct PreampStage {
  }
  cath=next;i=solve(vg,cath,true);
  }else cath=i*s.rk;
- return supply-i*s.rp;
+ double plate=supply-i*s.rp;if(s.rk==39000&&s.rp==100000){if(plateFiltered==0)plateFiltered=plate;plateFiltered+=(dt/(dt+100000*1e-9))*(plate-plateFiltered);return plateFiltered;}return plate;
  }
 };
 struct Preamp {
@@ -174,7 +174,7 @@ struct Preamp {
  if(clipping&&!postEQ)v=jose.process(v,dt,era,volume);
  const bool rectoFamily=isRecto(model);const bool modern=rectoFamily&&rectoModern(recto);
  const bool narrow=recto==RectoVoice::EarlyOrangeModern||recto==RectoVoice::RoadKing3Modern;
- const double presenceR=modern?22000.+(narrow?25000.:100000.)*std::clamp(presence,0.,1.):0.;
+ const double presenceR=modern&&recto!=RectoVoice::EarlyOrangeModern?22000.+((narrow||recto==RectoVoice::EarlyRed)?25000.:100000.)*std::clamp(presence,0.,1.):0.;
  if(rectoFamily){p.cb=20e-9;p.cm=20e-9;}
  v=tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.,presenceR);
  if(clipping&&postEQ)v=jose.process(v,dt,era,volume);return v;
