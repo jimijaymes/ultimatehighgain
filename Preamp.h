@@ -22,7 +22,7 @@ inline PreampSpec preampSpec(PreampModel m){
  switch(m){case PreampModel::Marshall:break;
  case PreampModel::Jose:p.count=4;p.stages={a,hot,cold,hot,warm};p.clip=12;break;
  case PreampModel::Peavey5150:p.count=5;p.stages={a,warm,cold,hot,warm};p.stages[2].rk=39000;p.slope=47000;break;
- case PreampModel::DualRectifier:case PreampModel::RectoOrange:case PreampModel::RectoRed:case PreampModel::RectoMulti:p.count=4;p.stages={a,warm,cold,hot,warm};p.stages[2].rk=39000;p.slope=47000;p.ct=500e-12;p.cb=p.cm=47e-9;if(m==PreampModel::RectoOrange)p.stages[3].atten=.08;else if(m==PreampModel::RectoMulti)p.stages[1].cc=10e-9;break;
+ case PreampModel::DualRectifier:case PreampModel::RectoOrange:case PreampModel::RectoRed:case PreampModel::RectoMulti:p.count=4;p.stages={a,warm,cold,hot,warm};p.stages[2].rk=39000;p.slope=47000;p.ct=500e-12;p.cb=p.cm=47e-9;if(m==PreampModel::RectoMulti)p.stages[1].cc=10e-9;break;
  case PreampModel::VHT:p.count=4;p.stages={a,hot,cold,warm,hot};p.stages[1].cc=4.7e-9;p.stages[2].cc=10e-9;break;
  case PreampModel::EVH5150III:case PreampModel::EVHBlue:p.count=4;p.stages={a,warm,cold,hot,warm};p.stages[1].cc=10e-9;break;
  case PreampModel::EVHRed:p.count=5;p.stages={a,warm,cold,hot,warm};p.stages[1].cc=10e-9;p.stages[3].atten=.18;break;}
@@ -149,8 +149,10 @@ struct Preamp {
  if(arch==JoseArchitecture::Legacy)arch=extraStage?JoseArchitecture::HBE:JoseArchitecture::Classic;
  if(!initialized||active!=model||evhActive!=evh||(biasActive!=bias||bypassActive!=bypass||(model==PreampModel::Jose && archActive!=arch))){*this=Preamp{};active=model;evhActive=evh;extraActive=extraStage;archActive=arch;biasActive=bias;bypassActive=bypass;initialized=true;}
  auto p=model==PreampModel::Jose?joseSpec(arch,bias,bypass):(evhFamily?evhSpec(evh,bias,bypass):modifiedSpec(model,bias,bypass)); double v=input;
- // Provisional channel routing: distinct channel seeds, not verified schematic values.
- if(model==PreampModel::RectoMulti){if(recto==RectoVoice::MultiOrangeVintage||recto==RectoVoice::MultiOrangeModern||recto==RectoVoice::RoadKing3Vintage||recto==RectoVoice::RoadKing3Modern)p.stages[3].atten=.08; if(recto==RectoVoice::RoadKing3Vintage||recto==RectoVoice::RoadKing3Modern||recto==RectoVoice::RoadKing4Vintage||recto==RectoVoice::RoadKing4Modern)p.stages[1].cc=22e-9;}
+ // Shared gain stages: avoid artificial channel gain differences. Treble capacitor values are secondary schematic reports; Multi-Watt follows mode.
+ if(model==PreampModel::RectoOrange)p.ct=500e-12;
+ if(model==PreampModel::RectoRed)p.ct=680e-12;
+ if(model==PreampModel::RectoMulti){const bool road=recto==RectoVoice::RoadKing3Vintage||recto==RectoVoice::RoadKing3Modern||recto==RectoVoice::RoadKing4Vintage||recto==RectoVoice::RoadKing4Modern;p.ct=road?500e-12:(rectoModern(recto)?680e-12:500e-12);}
  for(int i=0;i<p.count;++i){
  bool first=i==p.gainAfter+1;
  bool second=model==PreampModel::Jose && arch!=JoseArchitecture::Stock && arch!=JoseArchitecture::Molecular && i==2;
