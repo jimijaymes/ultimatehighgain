@@ -142,7 +142,7 @@ struct PreampStage {
 };
 struct Preamp {
  std::array<PreampStage,5> stages{}; ToneStack tone; JoseClip jose; PreampModel active=PreampModel::Marshall; EVHVoice evhActive=EVHVoice::Blue; bool initialized=false; bool extraActive=true,gain2Ready=false; double gain1DC=0; bool gain1Ready=false; double gain2DC=0; double outputDC=0, followerDC=0; JoseArchitecture archActive=JoseArchitecture::Legacy; ColdBias biasActive=ColdBias::Native; CathodeBypass bypassActive=CathodeBypass::Native;
- double process(double input,double supply,double dt,PreampModel model,double gain,double bass,double mid,double treble,JoseEra era=JoseEra::Zener20,bool extraStage=true,double gain2=.7,JoseArchitecture arch=JoseArchitecture::Legacy,ColdBias bias=ColdBias::Native,CathodeBypass bypass=CathodeBypass::Native,RectoVoice recto=RectoVoice::EarlyRed,EVHVoice evh=EVHVoice::Blue,bool eco=false,double volume=1.,bool postEQ=false){
+ double process(double input,double supply,double dt,PreampModel model,double gain,double bass,double mid,double treble,JoseEra era=JoseEra::Zener20,bool extraStage=true,double gain2=.7,JoseArchitecture arch=JoseArchitecture::Legacy,ColdBias bias=ColdBias::Native,CathodeBypass bypass=CathodeBypass::Native,RectoVoice recto=RectoVoice::EarlyRed,EVHVoice evh=EVHVoice::Blue,bool eco=false,double volume=1.,bool postEQ=false,int brightMode=1){
  bool evhFamily=model==PreampModel::EVH5150III; if(!evhFamily)evh=model==PreampModel::EVHRed?EVHVoice::Red:EVHVoice::Blue; model=resolveEVH(model,evh);
  model=resolveRecto(model,recto);
  if(arch==JoseArchitecture::Legacy)arch=extraStage?JoseArchitecture::HBE:JoseArchitecture::Classic;
@@ -152,7 +152,7 @@ struct Preamp {
  bool first=i==p.gainAfter+1;
  bool second=model==PreampModel::Jose && arch!=JoseArchitecture::Stock && arch!=JoseArchitecture::Molecular && i==2;
  double pos=first?std::clamp(gain,0.,1.):second?std::clamp(gain2,0.,1.):1.;
- double bright=first&&(model==PreampModel::Marshall||(model==PreampModel::Jose&&arch==JoseArchitecture::Stock))?470e-12:0.;
+ double bright=first&&(model==PreampModel::Marshall||model==PreampModel::Jose)?(brightMode==0?0.:brightMode==2?4.7e-9:470e-12):0.;
  v=stages[i].process(v,supply,dt,p.stages[i],pos,bright,first||second,eco);
  }
 
