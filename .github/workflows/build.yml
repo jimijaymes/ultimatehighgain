@@ -30,6 +30,16 @@ jobs:
         with:
           name: paired-benchmark
           path: paired-benchmark.csv
+      - name: Build AC30 settling investigation
+        run: cmake --build build --config Release --target ac30_settling --parallel 4
+      - name: Run AC30 settling investigation
+        run: |
+          & build/Release/ac30_settling.exe 2>&1 | Tee-Object -FilePath ac30-settling.txt
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ac30-settling
+          path: ac30-settling.txt
       - name: Build standalone power diagnostics
         run: cmake --build build --config Release --target power_diagnostics --parallel 4
       - name: Run power diagnostics

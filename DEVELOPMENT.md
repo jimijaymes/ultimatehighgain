@@ -138,3 +138,7 @@ Freeze exact v0.3.32 headers in baseline032 (namespace renamed only). Compare cu
 
 ## 0.3.36 — Restore Standard transformer bisection
 Paired benchmark run 46145796716 showed 25–37% slower affected models and low-level waveform differences (SLO relative RMS up to 86.77%). Restore exact v0.3.32 transformer root iteration, retain rail cache and all diagnostics. No Max, AC30, preamp voicing or tolerance changes. Verify paired benchmark before any further solver work.
+
+
+## 0.3.37 — AC30 settling investigation
+Add independent AC30 bench comparing 0.5, 2 and 5 seconds warmup, silence/1/10 mVrms, PI-only, reactive and resistive paths, all applicable CPU modes. Existing diagnostics unchanged. No DSP change; distinguish settling from persistent numerical noise before correction.
