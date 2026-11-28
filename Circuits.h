@@ -70,6 +70,48 @@ struct PhaseInverter {
  tailEstimate=cath;
  double p1=supply-i1*spec.plate1,p2=supply-i2*spec.plate2;if(!initialized){dc1=p1;dc2=p2;initialized=true;}dc1+=alpha*(p1-dc1);dc2+=alpha*(p2-dc2);o1=dc1-p1;o2=dc2-p2;
  }
+
+ // Coupled reduced-order PI output port and backward-Euler grid load.
+ // Preserve the engine's inverted plate-output convention (drive = dc - plate).
+ void loaded(double input,double feedback,double supply,double dt,double bias,double cathodeV,
+             double charge1,double charge2,double& o1,double& o2,PhaseInverterSpec spec,bool fast){
+  if(!initialized){process(input,feedback,supply,dt,o1,o2,spec,false);}
+  const double gc=spec.coupling/dt, gl=1/spec.gridLeak, gs=1/spec.gridStop;
+  const double g=gc+gl, gg=g+gs, threshold=cathodeV;
+  const double factor=1-spec.biasR/spec.tail;
+  auto solve=[&](double signal,double cath,double r,double dc,double charge){
+   auto eval=[&](double p,double& deriv){
+    const double drive=dc-p, rhs=bias*gl+gc*(drive-charge);
+    const bool conducting=rhs/g>threshold;
+    const double vg=conducting?(rhs+gs*threshold)/gg:rhs/g;
+    const double load=gc*(drive-charge-vg);
+    const double u=std::max(0.,1.125+signal+cath*factor-cath+2+(p-cath-250)/100);
+    constexpr double K=.0012/(1.125*1.0606601717798212);
+    const double root=std::sqrt(u), knee=std::clamp((p-cath)/10.,0.,1.);
+    const double ip=K*u*root*knee;
+    const double dip=1.5*K*root*knee/100+(p>cath&&p<cath+10?K*u*root/10:0);
+    deriv=1+r*(dip+gc*(1-gc/(conducting?gg:g)));
+    return p-supply+r*(ip-load);
+   };
+   double lo=-supply,hi=2*supply, p=std::clamp(dc,lo,hi);
+   for(int j=0;j<40;++j){double slope=0,f=eval(p,slope);if(std::abs(f)<1e-7)break;
+    if(f>0)hi=p;else lo=p;
+    const double next=p-f/slope;p=fast&&next>lo&&next<hi?next:(lo+hi)*.5;
+   }
+   const double u=std::max(0.,1.125+signal+cath*factor-cath+2+(p-cath-250)/100);
+   constexpr double K=.0012/(1.125*1.0606601717798212);
+   return std::array<double,2>{p,K*u*std::sqrt(u)*std::clamp((p-cath)/10.,0.,1.)};
+  };
+  double lo=0,hi=supply,cath=std::clamp(tailEstimate,lo,hi);
+  std::array<double,2> a{},b{};
+  for(int k=0;k<32;++k){a=solve(input,cath,spec.plate1,dc1,charge1);b=solve(feedback,cath,spec.plate2,dc2,charge2);
+   double f=(a[1]+b[1])*spec.tail-cath;if(std::abs(f)<1e-5||k==31)break;
+   if(f>0)lo=cath;else hi=cath;cath=(lo+hi)*.5;
+  }
+  tailEstimate=cath;
+  // Keep the unloaded DC reference: tracking loaded plate DC would erase blocking shifts.
+  o1=dc1-a[0];o2=dc2-b[0];
+ }
 };
-struct GridCoupling {double charge=0,keyDt=0,keyC=0,keyR=0,keyRs=0,gc=0,g=0,conductingG=0;double process(double drive,double bias,double dt,PhaseInverterSpec spec={}){double c=spec.coupling,r=spec.gridLeak,rs=spec.gridStop;if(dt!=keyDt||c!=keyC||r!=keyR||rs!=keyRs){keyDt=dt;keyC=c;keyR=r;keyRs=rs;gc=c/dt;g=1/r+gc;conductingG=g+1/rs;}const double rhs=bias/r+gc*(drive-charge);double v=rhs/g; if(v>0)v=rhs/conductingG;charge=drive-v;return v;}};
+struct GridCoupling {double charge=0,keyDt=0,keyC=0,keyR=0,keyRs=0,gc=0,g=0,conductingG=0;double process(double drive,double bias,double dt,PhaseInverterSpec spec={},double threshold=0){double c=spec.coupling,r=spec.gridLeak,rs=spec.gridStop;if(dt!=keyDt||c!=keyC||r!=keyR||rs!=keyRs){keyDt=dt;keyC=c;keyR=r;keyRs=rs;gc=c/dt;g=1/r+gc;conductingG=g+1/rs;}const double rhs=bias/r+gc*(drive-charge);double v=rhs/g; if(v>threshold)v=(rhs+threshold/rs)/conductingG;charge=drive-v;return v;}};
 }
