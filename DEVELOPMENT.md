@@ -90,3 +90,6 @@ Standalone power_diagnostics measures normal process() path, PI-only and detaile
 
 ## 0.3.23 — Economy power stage
 Economy normal path solves feedback implicitly using identical prior PI, presence and load states per trial. Linear output gain derived approximately from nominal watts and idle bias, with nominal load divider compensation. Retains physical monitoring scale, reactive load and native no-feedback modes. Standard/Max unchanged. CPU cost and convergence/audio unverified; rated power mapping provisional.
+
+## 0.3.24 — Ultra-Lead and native depth controls
+Fryette G100UL manual confirms parallel input triodes, optional third lead stage, KT88/6550, 120W and depth. Service bias document specifies 48–52mA. KT88 anchor is provisional (not curve fitted); parallel stage approximated via equivalent resistances; Hi Gain off bypasses third rather than fourth stage. Depth implemented as reduced-order 120Hz feedback shelf (not verified component values), default zero. Peavey/VHT/SLO and EVH Stealth/EL34 only; original EVH 100W no knob. SLO assumes modern depth-equipped variant. 12AT7 driver and GEQ pending. Sources: https://manualzz.com/doc/23615017/fryette-pittbull-ultra-lead-guitar-amplifier-owner-s-manual ; https://forum.fryette.com/uploads/short-url/quxe8dDdZgKM8jnZBXngH3EkODH.pdf . Build/audio unverified.

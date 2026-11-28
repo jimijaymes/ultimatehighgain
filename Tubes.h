@@ -3,10 +3,10 @@
 #include <algorithm>
 #include <array>
 namespace uhg {
-enum class Tube { EL34, EL84, L6 };
+enum class Tube { EL34, EL84, L6, KT88 };
 // Local datasheet anchor fit, not a full curve fit. SI units.
 struct TubeData {double mu, gm, va, vg, vs, ia, is, rp, knee, idle, rating;};
-inline TubeData data(Tube t){switch(t){case Tube::EL84:return {19,.0113,250,-7.3,250,.048,.0055,40000,18,.035,12};case Tube::L6:return {13,.006,250,-14,250,.072,.005,22500,30,.035,30};default:return {11,.011,250,-12,265,.100,.0149,15000,25,.035,25};}}
+inline TubeData data(Tube t){switch(t){case Tube::KT88:return {8,.0115,250,-15,250,.140,.003,12000,25,.050,42};case Tube::EL84:return {19,.0113,250,-7.3,250,.048,.0055,40000,18,.035,12};case Tube::L6:return {13,.006,250,-14,250,.072,.005,22500,30,.035,30};default:return {11,.011,250,-12,265,.100,.0149,15000,25,.035,25};}}
 inline double emission(TubeData t,double vg,double vs){double u0=1.5*t.ia/t.gm;double u=std::max(0.,u0+vg-t.vg+(vs-t.vs)/t.mu);return t.ia*(u/u0)*std::sqrt(u/u0);}
 // Shared immutable table of exp(-x), linear interpolation at 1/256 spacing.
 struct ValveExpTable {

@@ -9,8 +9,9 @@ inline double clamp(double x,double a,double b){return std::clamp(x,a,b);}
 inline double lp(double x,double &z,double f,double dt){z+=(1-std::exp(-6.283185307*f*dt))*(x-z);return z;}
 // Reduced-order RC feedback divider, with series presence rheostat and capacitor.
 struct PresenceNetwork {
- double capacitor=0;
- double process(double tap,double dt,double rf,double rg,double rp,double c){
+ double depthLow=0; double capacitor=0;
+ double process(double tap,double dt,double rf,double rg,double rp,double c,double depth=0){
+  depthLow+=(1-std::exp(-6.283185307*120.*dt))*(tap-depthLow);tap-=.75*std::clamp(depth,0.,1.)*depthLow;
   const double rth=rf*rg/(rf+rg), vth=tap*rg/(rf+rg);
   const double a=dt/c, i=(vth-capacitor)/(rth+rp+a);
   capacitor+=a*i;
@@ -30,9 +31,10 @@ case PowerModel::AC30: q.B=320;q.screen=310;q.primary=4000;q.reservoir=32e-6;q.s
 case PowerModel::AC50: q.B=440;q.screen=420;q.primary=3400;q.pairs=1;q.feedbackR=56000;q.reservoir=50e-6;break;
 case PowerModel::SLO: q.B=500;q.screen=480;q.primary=1900;q.feedbackR=39000;q.reservoir=100e-6;q.supplyR=35;break;
 default: break;}return q;}
-inline Tube nativeTube(PowerModel m){switch(m){case PowerModel::AC30:case PowerModel::MiniRecto:return Tube::EL84;case PowerModel::Peavey:case PowerModel::RectoVintage:case PowerModel::RectoModern:case PowerModel::VHT:case PowerModel::EVH:case PowerModel::SLO:return Tube::L6;default:return Tube::EL34;}}
+inline bool nativeDepth(PowerModel m,EVHVoice voice){return m==PowerModel::VHT||m==PowerModel::Peavey||m==PowerModel::SLO||(m==PowerModel::EVH&&(voice==EVHVoice::BlueEL34||voice==EVHVoice::BlueStealth||voice==EVHVoice::RedStealth));}
+inline Tube nativeTube(PowerModel m){switch(m){case PowerModel::VHT:return Tube::KT88;case PowerModel::AC30:case PowerModel::MiniRecto:return Tube::EL84;case PowerModel::Peavey:case PowerModel::RectoVintage:case PowerModel::RectoModern:case PowerModel::EVH:case PowerModel::SLO:return Tube::L6;default:return Tube::EL34;}}
 inline PhaseInverterSpec inverterSpec(PowerModel m){PhaseInverterSpec p;switch(m){case PowerModel::RectoVintage:case PowerModel::RectoModern:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::AC30:p.plate1=100000;p.plate2=100000;p.tail=48200;p.biasR=1200;p.coupling=150e-9;p.gridStop=1500;break;case PowerModel::MiniRecto:case PowerModel::Peavey:case PowerModel::EVH:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::VHT:case PowerModel::SLO:p.coupling=100e-9;p.gridStop=2200;break;default:break;}return p;}
-struct Controls {bool pittHi=true,pittBoost=false,pittEdge=false,pittShift=false;bool disableFeedback=false;bool inverterOnly=false;bool powerOnly=false;bool benchResistive=false;bool benchDirect=false;bool eco=false;bool autoTube=true;bool linkPower=true; PowerModel power=PowerModel::Marshall;double presence=.5, gain=.5, master=.25, bass=.5, mid=.5, treble=.5; bool spongy=false,tubeRect=false; Tube tube=Tube::EL34; PreampModel preamp=PreampModel::Marshall; JoseEra joseEra=JoseEra::Zener20; bool joseExtraStage=true; double joseGain2=.7; double volume=1.; bool josePostEQ=false; bool joseSAT=false; int brightMode=1; JoseArchitecture joseArchitecture=JoseArchitecture::Legacy; ColdBias joseBias=ColdBias::Native; CathodeBypass joseBypass=CathodeBypass::Native; ColdBias coldBias=ColdBias::Native; CathodeBypass coldBypass=CathodeBypass::Native; RectoVoice rectoVoice=RectoVoice::EarlyRed; EVHVoice evhVoice=EVHVoice::Blue;};
+struct Controls {bool pittHi=true,pittBoost=false,pittEdge=false,pittShift=false;bool disableFeedback=false;bool inverterOnly=false;bool powerOnly=false;bool benchResistive=false;bool benchDirect=false;bool eco=false;bool autoTube=true;bool linkPower=true; PowerModel power=PowerModel::Marshall;double resonance=0.,presence=.5, gain=.5, master=.25, bass=.5, mid=.5, treble=.5; bool spongy=false,tubeRect=false; Tube tube=Tube::EL34; PreampModel preamp=PreampModel::Marshall; JoseEra joseEra=JoseEra::Zener20; bool joseExtraStage=true; double joseGain2=.7; double volume=1.; bool josePostEQ=false; bool joseSAT=false; int brightMode=1; JoseArchitecture joseArchitecture=JoseArchitecture::Legacy; ColdBias joseBias=ColdBias::Native; CathodeBypass joseBypass=CathodeBypass::Native; ColdBias coldBias=ColdBias::Native; CathodeBypass coldBypass=CathodeBypass::Native; RectoVoice rectoVoice=RectoVoice::EarlyRed; EVHVoice evhVoice=EVHVoice::Blue;};
 struct Triode {
  double cap=0, blocking=0;
  double process(double input,double dt,double supply,double cathodeR){
@@ -71,7 +73,7 @@ struct Engine {
  } if(!controls.benchDirect)v*=(controls.preamp==PreampModel::Marshall||(controls.preamp==PreampModel::Jose&&controls.joseArchitecture==JoseArchitecture::Stock))?audioPot(controls.master):controls.master*controls.master;
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
- double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC);
+ double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC,nativeDepth(m,controls.evhVoice)?controls.resonance:0.);
  double d1,d2;if(controls.inverterOnly){pi.process(v,0.,supply*.72,dt,d1,d2,ps,controls.eco);return (d1-d2)/100.*0.251188643150958;}pi.process(v,feedback,supply*.72,dt,d1,d2,ps,controls.eco);
  if(m==PowerModel::AC30){double diff=d1-d2;double r=1000.+250000.*(1-controls.presence);double sourceR=100000.;double a=dt/4.7e-9;double i=(diff-cutState)/(r+sourceR+a);cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
  if(m==PowerModel::RectoModern&&(controls.powerOnly||!isRecto(controls.preamp)||!rectoModern(controls.rectoVoice))){double diff=d1-d2;double high=diff-lp(diff,modernState,2200,dt);double atten=.65*(1-controls.presence)*high;d1-=atten*.5;d2+=atten*.5;}

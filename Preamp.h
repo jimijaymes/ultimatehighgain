@@ -23,7 +23,7 @@ inline PreampSpec preampSpec(PreampModel m){
  case PreampModel::Jose:p.count=4;p.stages={a,hot,cold,hot,warm};p.clip=12;break;
  case PreampModel::Peavey5150:p.count=5;p.stages={a,warm,cold,hot,warm};p.stages[2].rk=39000;p.slope=47000;break;
  case PreampModel::DualRectifier:case PreampModel::RectoOrange:case PreampModel::RectoRed:case PreampModel::RectoMulti:p.count=4;p.stages={a,warm,cold,hot,warm};p.stages[0]={220e3,1800,1e-6,20e-9,1e6,1,0};p.stages[1]={100e3,1800,1e-6,20e-9,1e6,.64,2.082e-9};p.stages[2]={100e3,39000,0,20e-9,1e6,.68,0};p.stages[3]={220e3,1800,1e-6,20e-9,330e3,.60,0};p.slope=47000;p.ct=500e-12;p.cb=p.cm=20e-9;break;
- case PreampModel::VHT:p.count=4;p.stages={a,hot,cold,warm,hot};p.stages[1].cc=4.7e-9;p.stages[2].cc=10e-9;break;
+ case PreampModel::VHT:p.count=4;p.stages={a,hot,cold,warm,hot};p.stages[0].rp*=.5;p.stages[0].rk*=.5;p.stages[0].ck*=2.;p.stages[1].cc=4.7e-9;p.stages[2].cc=10e-9;break;
  case PreampModel::EVH5150III:case PreampModel::EVHBlue:p.count=4;p.stages={a,warm,cold,hot,warm};p.stages[1].cc=10e-9;break;
  case PreampModel::EVHRed:p.count=5;p.stages={a,warm,cold,hot,warm};p.stages[1].cc=10e-9;p.stages[3].atten=.18;break;}
  return p;
@@ -151,7 +151,7 @@ struct Preamp {
  if(arch==JoseArchitecture::Legacy)arch=extraStage?JoseArchitecture::HBE:JoseArchitecture::Classic;
  if(!initialized||active!=model||evhActive!=evh||(biasActive!=bias||bypassActive!=bypass||(model==PreampModel::Jose && archActive!=arch))){*this=Preamp{};active=model;evhActive=evh;extraActive=extraStage;archActive=arch;biasActive=bias;bypassActive=bypass;initialized=true;}
  auto p=model==PreampModel::Jose?joseSpec(arch,bias,bypass):(evhFamily?evhSpec(evh,bias,bypass):modifiedSpec(model,bias,bypass)); double v=input;
- if(model==PreampModel::VHT){p.count=pittHi?4:3;if(pittBoost)p.stages[1].atten*=1.7;if(pittEdge)p.stages[1].peakC=470e-12;if(pittShift){p.ct*=1.5;p.cb*=1.5;p.cm*=1.5;}}
+ if(model==PreampModel::VHT){if(!pittHi){p.stages[2]=p.stages[3];p.count=3;}if(pittBoost)p.stages[1].atten*=1.7;if(pittEdge)p.stages[1].peakC=470e-12;if(pittShift){p.ct*=1.5;p.cb*=1.5;p.cm*=1.5;}}
  // Shared gain stages: avoid artificial channel gain differences. Treble capacitor values are secondary schematic reports; Multi-Watt follows mode.
  if(model==PreampModel::RectoOrange)p.ct=500e-12;
  if(model==PreampModel::RectoRed)p.ct=680e-12;
