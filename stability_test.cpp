@@ -25,10 +25,11 @@ int main(){
  for(int n=0;n<48000;++n){double x=n>=12000&&n<24000?.04*std::sin(6.283185307*220*n/48000.):0.;double y=e.process(x);if(!std::isfinite(y))ok=false;if(n>=10000&&n<12000)idle+=y*y;if(n>=14000&&n<24000)signal+=y*y;if(n>=46000)tail+=y*y;}
  std::cout<<"Marshall isolation eco="<<eco<<" powerOnly="<<powerOnly<<" nofb="<<nofb<<" idle="<<std::sqrt(idle/2000)<<" signal="<<std::sqrt(signal/10000)<<" tail="<<std::sqrt(tail/2000)<<" rail="<<e.supply<<std::endl;
  }
- // Modular preamp-only output must be independent of power model and supply controls.
- for(int p=0;p<11;++p){
+ // Modular preamp-only output must be independent of power model at identical supply settings.
+ for(int p=0;p<11;++p)for(bool spongy:{false,true})for(bool rect:{false,true}){
  uhg::Engine a,b;a.controls.preamp=b.controls.preamp=static_cast<uhg::PreampModel>(p);
- a.controls.linkPower=b.controls.linkPower=false;a.controls.power=uhg::PowerModel::Marshall;b.controls.power=uhg::PowerModel::AC30;b.controls.spongy=true;b.controls.tubeRect=true;a.prepare(48000);b.prepare(48000);
+ a.controls.linkPower=b.controls.linkPower=false;a.controls.power=uhg::PowerModel::Marshall;b.controls.power=uhg::PowerModel::AC30;a.controls.spongy=b.controls.spongy=spongy;a.controls.tubeRect=b.controls.tubeRect=rect;a.prepare(48000);b.prepare(48000);
+ double rail=a.preampSupply();a.controls.spongy=false;a.controls.tubeRect=false;double normal=a.preampSupply();a.controls.spongy=spongy;a.controls.tubeRect=rect;if(rail!=b.preampSupply()||((spongy||rect)?!(rail<normal):rail!=normal)){std::cerr<<"Preamp rail control mismatch model="<<p<<std::endl;ok=false;}
  for(int n=0;n<2400;++n){double x=.04*std::sin(n*.0576);double y=a.processPreampOnly(x),z=b.processPreampOnly(x);if(!std::isfinite(y)||!std::isfinite(z)||y!=z){std::cerr<<"Independent preamp rail mismatch model="<<p<<" sample="<<n<<std::endl;ok=false;break;}}
  }
  return ok?0:1;

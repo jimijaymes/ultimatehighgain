@@ -113,3 +113,7 @@ Standard/Max Marshall power model feeds preamp from a 5 Hz first-order decoupled
 
 ## 0.3.30 — Independent modular preamp supply (experimental)
 Replace 0.3.29 Marshall-only filtered B+ with independent nominal preamp-family rail in Standard/Economy/Max, including preamp-only. Native family nominal B+ times existing 0.65/0.90 factors; provisional anchors, not measured per-stage rails. Power model, rectifier and spongy controls no longer alter preamp voltage; power-stage supply and PI remain unchanged. Add exact preamp-only invariance regression for all eleven preamp enum values. No shared sag in preamp; future linked supply network requires validation. Build and stability unverified.
+
+
+## 0.3.31 — Shared supply controls, independent rails
+Apply spongy (0.85 native B+) and tube rectifier (20 V upstream drop) to each preamp's native nominal supply before existing family scaling. Power stage retains independent target and dynamic sag. Test all four switch combinations for eleven preamp models, exact output independence across power models, and lower preamp rail with either switch. Values remain provisional existing approximations; no shared dynamic sag. Build pending.

@@ -62,7 +62,7 @@ struct Engine {
  case PreampModel::EVHBlue:case PreampModel::EVHRed:case PreampModel::EVH5150III:native=PowerModel::EVH;break;
  default:break;
  }
- return powerCircuit(native).B*(isRecto(controls.preamp)?.90:.65);
+ return (powerCircuit(native).B*(controls.spongy?.85:1.)-(controls.tubeRect?20.:0.))*(isRecto(controls.preamp)?.90:.65);
  }
 
  double step(double x){auto m=selectedPower();if(m!=activePower){circuit=powerCircuit(m);activePower=m;reset();}auto &q=circuit;
