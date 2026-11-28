@@ -43,12 +43,12 @@ struct PhaseInverter {
  double i=std::clamp(K*triodeLoad.get(u,K*r/100.),lo,hi);
  for(int k=0;k<20;++k){
  double vp=available-i*r, w=std::max(0.,u-i*r/100.);
- double knee=std::clamp(vp/10.,0.,1.);
- double f=K*w*std::sqrt(w)*knee-i;
+ double knee=std::clamp(vp/10.,0.,1.);const double root=std::sqrt(w);
+ double f=K*w*root*knee-i;
  if(std::abs(f)<1e-10)return i;
  if(f>0)lo=i;else hi=i;
- double slope=1+1.5*K*std::sqrt(w)*r/100.*knee;
- if(vp>0&&vp<10)slope+=K*w*std::sqrt(w)*r/10.;
+ double slope=1+1.5*K*root*r/100.*knee;
+ if(vp>0&&vp<10)slope+=K*w*root*r/10.;
  double next=i+f/slope;i=(next>lo&&next<hi)?next:(lo+hi)*.5;
  }
  return i;
@@ -70,5 +70,5 @@ struct PhaseInverter {
  double p1=supply-i1*spec.plate1,p2=supply-i2*spec.plate2;if(!initialized){dc1=p1;dc2=p2;initialized=true;}double alpha=1-std::exp(-6.283185307*2*dt);dc1+=alpha*(p1-dc1);dc2+=alpha*(p2-dc2);o1=dc1-p1;o2=dc2-p2;
  }
 };
-struct GridCoupling {double charge=0;double process(double drive,double bias,double dt,PhaseInverterSpec spec={}){double c=spec.coupling,r=spec.gridLeak,rs=spec.gridStop;double g=1/r+c/dt;double v=(bias/r+c/dt*(drive-charge))/g; if(v>0)v=(bias/r+c/dt*(drive-charge))/(g+1/rs);charge=drive-v;return v;}};
+struct GridCoupling {double charge=0;double process(double drive,double bias,double dt,PhaseInverterSpec spec={}){double c=spec.coupling,r=spec.gridLeak,rs=spec.gridStop;double gc=c/dt;double g=1/r+gc;const double rhs=bias/r+gc*(drive-charge);double v=rhs/g; if(v>0)v=rhs/(g+1/rs);charge=drive-v;return v;}};
 }
