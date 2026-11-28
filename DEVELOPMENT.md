@@ -20,3 +20,8 @@ Read this first on resuming work; verify relevant source before edits. Update th
 
 ## 0.3.2 development
 - Both modes now reuse identical redundant evaluations. Economy retains 12 primary, 3 screen and 14 outer PI iterations; Standard retains 16, 6 and 20. No further Economy accuracy reductions until user listening tests. Build, null and CPU benchmarks pending.
+
+## 0.3.3 — Max reference and invariant coefficients
+- Max uses separate frozen 0.3.2 Standard DSP headers in reference032; never optimise these headers. Only selected engine runs. Switching to/from Max resets destination state; compare fresh renders, not live switching transients.
+- Standard and Economy hoist invariant preamp solver factors without changing dynamic update rates or iteration limits. Existing CPU choice indices retained; host automation normalization compatibility needs testing.
+- Build, null tests and CPU measurements pending. Reference is frozen for optimisation comparisons; future circuit changes require an explicit reference policy.
