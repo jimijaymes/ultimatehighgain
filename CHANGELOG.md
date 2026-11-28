@@ -98,3 +98,6 @@ Manual EL34 selection retains Pittbull topology and depth, uses provisional 35mA
 
 ## 0.3.26 — Detailed feedback stabilization
 Uploaded 252-row diagnostic: Economy stable and open-loop gain within 0.32dB; Standard/Max Vintage silent output 55.216V. Solve instantaneous feedback with rollback of PI, coupling, supply and reactive states per trial in both detailed engines. Increase primary solve precision. Expand diagnostics to all ten power models, all CPU modes, representative presence/depth/supply settings and valve overrides; exclude above-Nyquist harmonics, longer settling, flag silence and low-level distortion. Diagnostic failure remains visible but permits VST3 build for audition. Not compiled or measured yet; CPU and convergence risks remain. No valve curve changes.
+
+## 0.3.27 — Build correction
+Rename detailed feedback solver local x to feedbackEstimate in Standard and Max to resolve MSVC C2082. No DSP behavior changes. Build pending.
