@@ -86,11 +86,12 @@ struct Engine {
  
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
+ if(controls.eco&&!controls.benchDirect&&!controls.inverterOnly)return economyClosedLoop(v,m,q,ps);
  double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,coeff.presenceR,q.presenceC);
  double d1,d2;if(controls.inverterOnly){pi.process(v,0.,supply*.72,dt,d1,d2,ps,controls.eco);return (d1-d2)/100.*0.251188643150958;}pi.process(v,feedback,supply*.72,dt,d1,d2,ps,controls.eco);
  if(m==PowerModel::AC30){double diff=d1-d2;double sourceR=100000.;double a=coeff.cutA;double i=(diff-cutState)/coeff.cutDen;cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
  if(m==PowerModel::RectoModern&&(controls.powerOnly||!isRecto(controls.preamp)||!rectoModern(controls.rectoVoice))){double diff=d1-d2;modernState+=coeff.modernAlpha*(diff-modernState);double high=diff-modernState;double atten=coeff.modernGain*high;d1-=atten*.5;d2+=atten*.5;}
- if(controls.eco&&!controls.benchDirect)return economyPower((d1-d2)*.1,m,q);
+ 
  double g1=grid1.process(d1,cathodeBias?0:bias,dt,ps,cathodeV)-cathodeV,g2=grid2.process(d2,cathodeBias?0:bias,dt,ps,cathodeV)-cathodeV;
 
  // Solve plate/screen current against the same instantaneous reflected voltage.
@@ -125,6 +126,21 @@ struct Engine {
  capV=(nextI+history)*coeff.invG;indI+=coeff.indStep*capV;coilI=nextI;fb=q.load*.8*coilI+capV+(.0005/dt)*(coilI-oldCoilI);return 0.251188643150958*fb/std::sqrt(2.*q.load*100.);
  }
  double economyLow=0,economyHigh=0,economyCap=0,economyInd=0,economyCoil=0;
+ double economyClosedLoop(double input,PowerModel m,const Circuit& q,const PhaseInverterSpec& ps){
+ const bool closed=!controls.disableFeedback&&m!=PowerModel::RectoModern&&m!=PowerModel::AC30;
+ const auto oldPI=pi;const auto oldPresence=presenceNet;
+ const double low=economyLow,cap=economyCap,ind=economyInd,coil=economyCoil,cut=cutState,modern=modernState;
+ auto trial=[&](double terminal){pi=oldPI;presenceNet=oldPresence;economyLow=low;economyCap=cap;economyInd=ind;economyCoil=coil;cutState=cut;modernState=modern;
+ double feedback=closed?presenceNet.process(terminal*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,coeff.presenceR,q.presenceC):0.;
+ double a,b;pi.process(input,feedback,supply*.72,dt,a,b,ps,true);
+ if(m==PowerModel::AC30){double i=(a-b-cutState)/coeff.cutDen;cutState+=coeff.cutA*i;a-=i*50000.;b+=i*50000.;}
+ if(m==PowerModel::RectoModern&&(controls.powerOnly||!isRecto(controls.preamp)||!rectoModern(controls.rectoVoice))){double diff=a-b;modernState+=coeff.modernAlpha*(diff-modernState);double atten=coeff.modernGain*(diff-modernState);a-=atten*.5;b+=atten*.5;}
+ return economyPower(a-b,m,q);};
+ if(!closed)return trial(0.);
+ // Implicit feedback: evaluate from identical old states, commit only the accepted trial.
+ double lo=-4096.,hi=4096.,x=std::clamp(fb,lo,hi),y=0.,fl=0.,fh=0.;bool haveL=false,haveH=false;
+ for(int k=0;k<32;++k){y=trial(x);double f=fb-x;if(std::abs(f)<1e-5)return y;if(f>0){lo=x;fl=f;haveL=true;}else{hi=x;fh=f;haveH=true;}double next=haveL&&haveH?lo+(hi-lo)*fl/(fl-fh):std::clamp(x+f*.25,lo,hi);if(k%4==3||!(next>lo&&next<hi))next=(lo+hi)*.5;x=next;}return trial(x);
+ }
  double economyPower(double v,PowerModel m,const Circuit& q){
  // Linear Thevenin source into passive speaker impedance; no nonlinear tube solver.
  // Open-loop source impedance; closed-loop damping emerges from the PI feedback.
@@ -132,7 +148,10 @@ struct Engine {
  const double rs=q.load*damping;
  const double low=lp(v,economyLow,m==PowerModel::AC30?65.:35.,dt);
  const double ac=v-low;
- const double drive=ac*4.;
+ // Approximate class-AB full drive: differential grid peak ~= twice idle bias.
+ const double watts=m==PowerModel::AC30?30.:m==PowerModel::MiniRecto?25.:m==PowerModel::AC50?50.:100.;
+ const double gridPeak=2*std::max(5.,std::abs(bias));
+ const double drive=ac*(std::sqrt(2*q.load*watts)/gridPeak)*(1+damping);
  constexpr double L=.018,w=6.283185307*95.;
  const double gc=1/(w*w*L*dt), gl=dt/L, z=1/(1/(q.load*5.45)+gc+gl);
  const double hist=gc*economyCap-economyInd;

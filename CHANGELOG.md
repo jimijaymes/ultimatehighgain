@@ -86,3 +86,6 @@ Revert only the primary and screen solver changes from 0.3.19 after reported cli
 
 ## 0.3.22 — Diagnostic-only baseline
 Standalone power_diagnostics measures normal process() path, PI-only and detailed resistive bench across Recto Vintage/Modern, CPU modes, feedback, sample rates and signal levels. CSV reports RMS, peak, fundamental, THD, residual THD+N, supply, screen, bias and elapsed time. Nonfinite or missing output fails; distortion is recorded without speculative pass limits. No DSP changes.
+
+## 0.3.23 — Economy power stage
+Economy normal path solves feedback implicitly using identical prior PI, presence and load states per trial. Linear output gain derived approximately from nominal watts and idle bias, with nominal load divider compensation. Retains physical monitoring scale, reactive load and native no-feedback modes. Standard/Max unchanged. CPU cost and convergence/audio unverified; rated power mapping provisional.
