@@ -144,12 +144,13 @@ struct PreampStage {
 };
 struct Preamp {
  std::array<PreampStage,5> stages{}; ToneStack tone; JoseClip jose; PreampModel active=PreampModel::Marshall; EVHVoice evhActive=EVHVoice::Blue; bool initialized=false; bool extraActive=true,gain2Ready=false; double gain1DC=0; bool gain1Ready=false; double gain2DC=0; double outputDC=0, followerDC=0; JoseArchitecture archActive=JoseArchitecture::Legacy; ColdBias biasActive=ColdBias::Native; CathodeBypass bypassActive=CathodeBypass::Native;
- double process(double input,double supply,double dt,PreampModel model,double gain,double bass,double mid,double treble,JoseEra era=JoseEra::Zener20,bool extraStage=true,double gain2=.7,JoseArchitecture arch=JoseArchitecture::Legacy,ColdBias bias=ColdBias::Native,CathodeBypass bypass=CathodeBypass::Native,RectoVoice recto=RectoVoice::EarlyRed,EVHVoice evh=EVHVoice::Blue,bool eco=false,double volume=1.,bool postEQ=false,int brightMode=1,double presence=.5){
+ double process(double input,double supply,double dt,PreampModel model,double gain,double bass,double mid,double treble,JoseEra era=JoseEra::Zener20,bool extraStage=true,double gain2=.7,JoseArchitecture arch=JoseArchitecture::Legacy,ColdBias bias=ColdBias::Native,CathodeBypass bypass=CathodeBypass::Native,RectoVoice recto=RectoVoice::EarlyRed,EVHVoice evh=EVHVoice::Blue,bool eco=false,double volume=1.,bool postEQ=false,int brightMode=1,double presence=.5,bool pittHi=true,bool pittBoost=false,bool pittEdge=false,bool pittShift=false){
  bool evhFamily=model==PreampModel::EVH5150III; if(!evhFamily)evh=model==PreampModel::EVHRed?EVHVoice::Red:EVHVoice::Blue; model=resolveEVH(model,evh);
  model=resolveRecto(model,recto);
  if(arch==JoseArchitecture::Legacy)arch=extraStage?JoseArchitecture::HBE:JoseArchitecture::Classic;
  if(!initialized||active!=model||evhActive!=evh||(biasActive!=bias||bypassActive!=bypass||(model==PreampModel::Jose && archActive!=arch))){*this=Preamp{};active=model;evhActive=evh;extraActive=extraStage;archActive=arch;biasActive=bias;bypassActive=bypass;initialized=true;}
  auto p=model==PreampModel::Jose?joseSpec(arch,bias,bypass):(evhFamily?evhSpec(evh,bias,bypass):modifiedSpec(model,bias,bypass)); double v=input;
+ if(model==PreampModel::VHT){p.count=pittHi?4:3;if(pittBoost)p.stages[1].atten*=1.7;if(pittEdge)p.stages[1].peakC=470e-12;if(pittShift){p.ct*=1.5;p.cb*=1.5;p.cm*=1.5;}}
  // Shared gain stages: avoid artificial channel gain differences. Treble capacitor values are secondary schematic reports; Multi-Watt follows mode.
  if(model==PreampModel::RectoOrange)p.ct=500e-12;
  if(model==PreampModel::RectoRed)p.ct=680e-12;
@@ -175,7 +176,7 @@ struct Preamp {
  if(clipping&&!postEQ)v=jose.process(v,dt,era,volume);
  const bool rectoFamily=isRecto(model);const bool modern=rectoFamily&&rectoModern(recto);
  const bool narrow=recto==RectoVoice::EarlyOrangeModern||recto==RectoVoice::RoadKing3Modern;
- const double presenceR=modern&&recto!=RectoVoice::EarlyOrangeModern?22000.+((narrow||recto==RectoVoice::EarlyRed)?25000.:100000.)*std::clamp(presence,0.,1.):0.;
+ const double presenceR=modern?22000.+((narrow||recto==RectoVoice::EarlyRed)?25000.:100000.)*std::clamp(presence,0.,1.):0.;
  if(rectoFamily){p.cb=20e-9;p.cm=20e-9;}
  v=tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.,presenceR);
  if(clipping&&postEQ)v=jose.process(v,dt,era,volume);return v;

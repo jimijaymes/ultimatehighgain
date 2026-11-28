@@ -69,3 +69,6 @@ Remove artificial +/-30 V PI input clamp in both engines; retain physical valve/
 
 ## 0.3.16 — Input/output diagnostic trims
 Input trim and Output use -24 to +24 dB, default 0 dB, double-click reset. Input before all modes, output after cabinet. Existing Output ID and normalized automation mapping retained; migrate old saved raw output values to dB. No changes to circuit engines. Block-rate gain changes; build/UI verification pending.
+
+## 0.3.17 — Rectifier presence routing and Pittbull switches
+Modern presence tone-stack branch enabled for early Orange Modern as provisional 25k range; power-only Modern uses existing PI-side HF contour instead of skipping presence. Economy avoids duplicate Modern presence shelf. Vintage feedback circuit unchanged. Pittbull CL-inspired Hi Gain (3/4 stages), Boost (interstage attenuation), Edge (peaker), Shift (tone-stack caps) added; values provisional, not traced from schematic. Hi Gain defaults on to preserve previous stage count. No KT88, depth or graphic EQ changes. Compile/audio/UI unverified.
