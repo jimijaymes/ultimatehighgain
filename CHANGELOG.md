@@ -141,3 +141,7 @@ Paired benchmark run 46145796716 showed 25–37% slower affected models and low-
 
 ## 0.3.37 — AC30 settling investigation
 Add independent AC30 bench comparing 0.5, 2 and 5 seconds warmup, silence/1/10 mVrms, PI-only, reactive and resistive paths, all applicable CPU modes. Existing diagnostics unchanged. No DSP change; distinguish settling from persistent numerical noise before correction.
+
+
+## 0.3.38 — Standard negative feedback convergence experiment
+Add safeguarded secant predictor to the detailed global feedback root solve, preserving the 0.0001 residual tolerance and original 40-iteration fallback from identical initial state. No changes to open-loop, AC30, Rectifier Modern, Economy, Max or preamp. User reports real-time dropouts with feedback enabled; verify paired waveform and timing before accepting. Worst-case fallback adds up to seven trial evaluations; not a guaranteed real-time fix.

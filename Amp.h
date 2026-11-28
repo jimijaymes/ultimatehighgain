@@ -112,7 +112,26 @@ struct Engine {
  const auto oldPI=pi;const auto oldPresence=presenceNet;const auto oldGrid1=grid1,oldGrid2=grid2;
  const double oldSupply=supply,oldScreen=screen,oldCath=cathodeV,oldMag=magI,oldFlux=flux,oldCap=capV,oldInd=indI,oldCoil=coilI,oldPeak=peakPlate,oldCut=cutState,oldModern=modernState;
  auto trial=[&](double terminal){pi=oldPI;presenceNet=oldPresence;grid1=oldGrid1;grid2=oldGrid2;supply=oldSupply;screen=oldScreen;cathodeV=oldCath;magI=oldMag;flux=oldFlux;capV=oldCap;indI=oldInd;coilI=oldCoil;peakPlate=oldPeak;cutState=oldCut;modernState=oldModern;return detailedTrial(v,m,q,t,ps,cathodeBias,target,terminal);};
- double lo=-512.,hi=512.,feedbackEstimate=std::clamp(fb,lo,hi),fl=0.,fh=0.;bool haveL=false,haveH=false;
+ const double initialFeedback=std::clamp(fb,-512.,512.);
+ // Safeguarded secant predictor: all trials replay identical physical state.
+ // Accept only the original residual tolerance; otherwise replay the original solver.
+ double x0=initialFeedback,y0=trial(x0),f0=fb-x0;
+ if(std::abs(f0)<.0001)return y0;
+ double x1=std::clamp(x0+f0*.25,-512.,512.);
+ double lower=-512.,upper=512.;
+ if(f0>0)lower=x0;else upper=x0;
+ for(int j=0;j<6&&x1>lower&&x1<upper;++j){
+  double y1=trial(x1),f1=fb-x1;
+  if(std::abs(f1)<.0001)return y1;
+  if(!std::isfinite(f1))break;
+  if(f1>0)lower=x1;else upper=x1;
+  const double df=f1-f0;
+  if(df==0.)break;
+  const double next=x1-f1*(x1-x0)/df;
+  if(!std::isfinite(next)||!(next>lower&&next<upper))break;
+  x0=x1;f0=f1;x1=next;
+ }
+ double lo=-512.,hi=512.,feedbackEstimate=initialFeedback,fl=0.,fh=0.;bool haveL=false,haveH=false;
  for(int k=0;k<40;++k){double y=trial(feedbackEstimate),f=fb-feedbackEstimate;if(std::abs(f)<.0001)return y;if(f>0){lo=feedbackEstimate;fl=f;haveL=true;}else{hi=feedbackEstimate;fh=f;haveH=true;}double next=haveL&&haveH?lo+(hi-lo)*fl/(fl-fh):feedbackEstimate+f*.25;if(k%4==3||!(next>lo&&next<hi))next=(lo+hi)*.5;feedbackEstimate=next;}return trial(feedbackEstimate);
  }
  double detailedTrial(double v,PowerModel m,const Circuit& q,const TubeData& t,const PhaseInverterSpec& ps,bool cathodeBias,double target,double terminal){
