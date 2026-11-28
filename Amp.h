@@ -31,7 +31,7 @@ case PowerModel::AC50: q.B=440;q.screen=420;q.primary=3400;q.pairs=1;q.feedbackR
 case PowerModel::SLO: q.B=500;q.screen=480;q.primary=1900;q.feedbackR=39000;q.reservoir=100e-6;q.supplyR=35;break;
 default: break;}return q;}
 inline Tube nativeTube(PowerModel m){switch(m){case PowerModel::AC30:case PowerModel::MiniRecto:return Tube::EL84;case PowerModel::Peavey:case PowerModel::RectoVintage:case PowerModel::RectoModern:case PowerModel::VHT:case PowerModel::EVH:case PowerModel::SLO:return Tube::L6;default:return Tube::EL34;}}
-inline PhaseInverterSpec inverterSpec(PowerModel m){PhaseInverterSpec p;switch(m){case PowerModel::RectoVintage:case PowerModel::RectoModern:p.coupling=100e-9;p.gridStop=1500;break;case PowerModel::AC30:p.plate1=100000;p.plate2=100000;p.tail=48200;p.biasR=1200;p.coupling=150e-9;p.gridStop=1500;break;case PowerModel::MiniRecto:case PowerModel::Peavey:case PowerModel::EVH:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::VHT:case PowerModel::SLO:p.coupling=100e-9;p.gridStop=2200;break;default:break;}return p;}
+inline PhaseInverterSpec inverterSpec(PowerModel m){PhaseInverterSpec p;switch(m){case PowerModel::RectoVintage:case PowerModel::RectoModern:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::AC30:p.plate1=100000;p.plate2=100000;p.tail=48200;p.biasR=1200;p.coupling=150e-9;p.gridStop=1500;break;case PowerModel::MiniRecto:case PowerModel::Peavey:case PowerModel::EVH:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::VHT:case PowerModel::SLO:p.coupling=100e-9;p.gridStop=2200;break;default:break;}return p;}
 struct Controls {bool disableFeedback=false;bool inverterOnly=false;bool eco=false;bool autoTube=true;bool linkPower=true; PowerModel power=PowerModel::Marshall;double presence=.5, gain=.5, master=.25, bass=.5, mid=.5, treble=.5; bool spongy=false,tubeRect=false; Tube tube=Tube::EL34; PreampModel preamp=PreampModel::Marshall; JoseEra joseEra=JoseEra::Zener20; bool joseExtraStage=true; double joseGain2=.7; double volume=1.; bool josePostEQ=false; bool joseSAT=false; int brightMode=1; JoseArchitecture joseArchitecture=JoseArchitecture::Legacy; ColdBias joseBias=ColdBias::Native; CathodeBypass joseBypass=CathodeBypass::Native; ColdBias coldBias=ColdBias::Native; CathodeBypass coldBypass=CathodeBypass::Native; RectoVoice rectoVoice=RectoVoice::EarlyRed; EVHVoice evhVoice=EVHVoice::Blue;};
 struct Triode {
  double cap=0, blocking=0;
@@ -54,11 +54,11 @@ struct Engine {
  if(coeff.dt!=dt||coeff.model!=m||coeff.tubeRect!=controls.tubeRect){
  coeff.dt=dt;coeff.model=m;coeff.tubeRect=controls.tubeRect;
  coeff.invRatio=std::sqrt(q.load/q.primary);coeff.magStep=dt/q.transformerL;coeff.invFlux=1/q.fluxLimit;
- constexpr double Lm=.018,omega=6.283185307*95.;
+ constexpr double Lm=.018,omega=6.283185307*95.; // Fixed generic 4x12 reactive impedance
  coeff.capG=1/(omega*omega*Lm*dt);coeff.indStep=dt/Lm;
- coeff.invG=1/(1/(q.load*4)+coeff.indStep+coeff.capG);
- coeff.coilG=(.00045+q.leakage*q.load/q.primary)/dt;coeff.rs=q.load*.12;
- coeff.invDen=1/(q.load*.75+coeff.rs+coeff.coilG+coeff.invG);
+ coeff.invG=1/(1/(q.load*5.45)+coeff.indStep+coeff.capG);
+ coeff.coilG=(.0005+q.leakage*q.load/q.primary)/dt;coeff.rs=q.load*.12;
+ coeff.invDen=1/(q.load*.8+coeff.rs+coeff.coilG+coeff.invG);
  coeff.supplyStep=dt/q.reservoir;coeff.invSupplyR=1/(q.supplyR+(controls.tubeRect?65:0));
  coeff.screenAlpha=-std::expm1(-6.283185307*35*dt);coeff.feedbackScale=std::sqrt(q.feedbackTap/q.load);
  }
@@ -78,8 +78,11 @@ struct Engine {
  struct Branch {double ip,is;};
  auto branch=[&](double vp,double vg){double low=0,high=screen,fl=-screen,fh=screenCurrent(t,vp-cathodeV,vg,std::max(0.,screen-cathodeV))*q.screenR;double vs=screen;for(int j=0;j<6;++j){vs=low+(high-low)*(-fl)/(fh-fl);double f=vs+screenCurrent(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV))*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}return Branch{plate(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV)),screenCurrent(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV))};};
  // Implicit quasi-static primary load line; speaker dynamic state remains explicit.
+ const double loadHistory=coeff.capG*capV-indI;
+ const double reflectedHistory=(loadHistory*coeff.invG-coeff.coilG*coilI)/coeff.invRatio;
+ const double reflectedZ=1/(coeff.invDen*coeff.invRatio*coeff.invRatio);
  double lo=-2*supply,hi=2*supply;
- auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);return ((a.ip-b.ip)*q.pairs*.5-magI)*q.primary-v;};
+ auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);return ((a.ip-b.ip)*q.pairs*.5-magI)*reflectedZ+reflectedHistory-v;};
  double primaryV=0;
  for(int k=0;k<16;++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.002){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
  primaryV=(lo+hi)*.5;auto a1=branch(supply-primaryV*.5,g1),a2=branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
