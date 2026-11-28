@@ -25,3 +25,8 @@ Read this first on resuming work; verify relevant source before edits. Update th
 - Max uses separate frozen 0.3.2 Standard DSP headers in reference032; never optimise these headers. Only selected engine runs. Switching to/from Max resets destination state; compare fresh renders, not live switching transients.
 - Standard and Economy hoist invariant preamp solver factors without changing dynamic update rates or iteration limits. Existing CPU choice indices retained; host automation normalization compatibility needs testing.
 - Build, null tests and CPU measurements pending. Reference is frozen for optimisation comparisons; future circuit changes require an explicit reference policy.
+
+## Max reference policy (supersedes frozen-reference policy above)
+- Max is a living maximum-fidelity reference, initially based on 0.3.2 Standard. Apply circuit accuracy improvements and higher-cost fidelity features to Max; do not apply computational simplifications, coefficient-hoisting optimisations, reduced update rates or solver precision reductions to Max.
+- Standard and Economy receive shared fidelity-preserving optimisations; retain existing Economy accuracy settings until user testing. For expensive fidelity improvements, implement Max first and evaluate equivalent efficient implementations for Standard/Economy; document any fidelity differences explicitly.
+- Keep reference headers independent and record reference revisions so comparisons remain reproducible. No DSP changes in this policy update.
