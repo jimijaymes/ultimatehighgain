@@ -143,7 +143,7 @@ struct PreampStage {
 };
 struct Preamp {
  std::array<PreampStage,5> stages{}; ToneStack tone; JoseClip jose; PreampModel active=PreampModel::Marshall; EVHVoice evhActive=EVHVoice::Blue; bool initialized=false; bool extraActive=true,gain2Ready=false; double gain1DC=0; bool gain1Ready=false; double gain2DC=0; double outputDC=0, followerDC=0; JoseArchitecture archActive=JoseArchitecture::Legacy; ColdBias biasActive=ColdBias::Native; CathodeBypass bypassActive=CathodeBypass::Native;
- double process(double input,double supply,double dt,PreampModel model,double gain,double bass,double mid,double treble,JoseEra era=JoseEra::Zener20,bool extraStage=true,double gain2=.7,JoseArchitecture arch=JoseArchitecture::Legacy,ColdBias bias=ColdBias::Native,CathodeBypass bypass=CathodeBypass::Native,RectoVoice recto=RectoVoice::EarlyRed,EVHVoice evh=EVHVoice::Blue,bool eco=false,double volume=1.,bool postEQ=false,int brightMode=1){
+ double process(double input,double supply,double dt,PreampModel model,double gain,double bass,double mid,double treble,JoseEra era=JoseEra::Zener20,bool extraStage=true,double gain2=.7,JoseArchitecture arch=JoseArchitecture::Legacy,ColdBias bias=ColdBias::Native,CathodeBypass bypass=CathodeBypass::Native,RectoVoice recto=RectoVoice::EarlyRed,EVHVoice evh=EVHVoice::Blue,bool eco=false,double volume=1.,bool postEQ=false,int brightMode=1,double presence=.5){
  bool evhFamily=model==PreampModel::EVH5150III; if(!evhFamily)evh=model==PreampModel::EVHRed?EVHVoice::Red:EVHVoice::Blue; model=resolveEVH(model,evh);
  model=resolveRecto(model,recto);
  if(arch==JoseArchitecture::Legacy)arch=extraStage?JoseArchitecture::HBE:JoseArchitecture::Classic;
@@ -172,7 +172,11 @@ struct Preamp {
  }else{double lo=0,hi=supply;for(int j=0;j<22;++j){double k=(lo+hi)*.5; if(triodeCurrent(supply-k,v-k)>k/100000.)lo=k;else hi=k;} follower=(lo+hi)*.5;}}if(followerDC==0)followerDC=follower;followerDC+=dt/(.02+dt)*(follower-followerDC);v=(follower-followerDC); if(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)v=(follower-followerDC);
  const bool clipping=model==PreampModel::Jose && arch!=JoseArchitecture::Stock;
  if(clipping&&!postEQ)v=jose.process(v,dt,era,volume);
- v=tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.);
+ const bool rectoFamily=isRecto(model);const bool modern=rectoFamily&&rectoModern(recto);
+ const bool narrow=recto==RectoVoice::EarlyOrangeModern||recto==RectoVoice::RoadKing3Modern;
+ const double presenceR=modern?22000.+(narrow?25000.:100000.)*std::clamp(presence,0.,1.):0.;
+ if(rectoFamily){p.cb=20e-9;p.cm=20e-9;}
+ v=tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.,presenceR);
  if(clipping&&postEQ)v=jose.process(v,dt,era,volume);return v;
  }
 };
