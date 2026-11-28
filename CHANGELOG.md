@@ -24,3 +24,8 @@
 
 ## 0.1.0
 - Existing modular amplifier DSP and JUCE plugin baseline.
+
+## 0.3.3 — Max reference and invariant coefficients
+- Max uses separate frozen 0.3.2 Standard DSP headers in reference032; never optimise these headers. Only selected engine runs. Switching to/from Max resets destination state; compare fresh renders, not live switching transients.
+- Standard and Economy hoist invariant preamp solver factors without changing dynamic update rates or iteration limits. Existing CPU choice indices retained; host automation normalization compatibility needs testing.
+- Build, null tests and CPU measurements pending. Reference is frozen for optimisation comparisons; future circuit changes require an explicit reference policy.
