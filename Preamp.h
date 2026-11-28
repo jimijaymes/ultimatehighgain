@@ -9,7 +9,7 @@ inline PreampModel resolveEVH(PreampModel m,EVHVoice v){return m==PreampModel::E
 enum class RectoVoice { EarlyOrange, EarlyRed, MultiWattModern };
 inline bool isRecto(PreampModel m){return m==PreampModel::RectoOrange||m==PreampModel::RectoRed||m==PreampModel::RectoMulti||m==PreampModel::DualRectifier;}
 inline PreampModel resolveRecto(PreampModel m, RectoVoice v){if(m!=PreampModel::DualRectifier)return m;return v==RectoVoice::EarlyOrange?PreampModel::RectoOrange:v==RectoVoice::EarlyRed?PreampModel::RectoRed:PreampModel::RectoMulti;}
-enum class JoseArchitecture { Legacy, Classic, HBE, Snorkler, Stock };
+enum class JoseArchitecture { Legacy, Classic, HBE, Snorkler, Stock, JosePostEQ, Molecular };
 enum class ColdBias { Native, Warm, Modified, Marshall, Cold, Soldano, Custom47k };
 enum class CathodeBypass { Native, Off, Small, Medium, Large };
 struct StageSpec { double rp,rk,ck,cc,rg,atten,peakC; };
@@ -29,8 +29,9 @@ inline PreampSpec preampSpec(PreampModel m){
 }
 inline PreampSpec joseSpec(JoseArchitecture arch, ColdBias bias, CathodeBypass bypass){
  auto p=preampSpec(PreampModel::Jose); int cold=2;
- if(arch==JoseArchitecture::Classic||arch==JoseArchitecture::Stock){p=preampSpec(PreampModel::Marshall);cold=1;}
+ if(arch==JoseArchitecture::Classic||arch==JoseArchitecture::JosePostEQ||arch==JoseArchitecture::Stock||arch==JoseArchitecture::Molecular){p=preampSpec(PreampModel::Marshall);cold=1;}
  if(arch==JoseArchitecture::Snorkler){p.stages[2].rk=1500;p.stages[2].ck=1e-6;p.stages[3].rk=1500;p.stages[3].ck=1e-6;p.slope=100000;for(int i=1;i<4;++i)p.stages[i].cc=47e-9;}
+ if(arch==JoseArchitecture::Molecular){p.stages[0].ck=.68e-6;p.stages[1].peakC=500e-12;p.ct=500e-12;} // provisional layout-inspired seed
  const double r[]={0,1500,4700,10000,22000,39000,47000}; const double c[]={0,0,.68e-6,1e-6,22e-6};
  if(bias!=ColdBias::Native){p.stages[cold].rk=r[static_cast<int>(bias)];p.stages[cold].ck=0;}
  if(bypass!=CathodeBypass::Native)p.stages[cold].ck=c[static_cast<int>(bypass)];return p;
@@ -141,7 +142,7 @@ struct PreampStage {
 };
 struct Preamp {
  std::array<PreampStage,5> stages{}; ToneStack tone; JoseClip jose; PreampModel active=PreampModel::Marshall; EVHVoice evhActive=EVHVoice::Blue; bool initialized=false; bool extraActive=true,gain2Ready=false; double gain1DC=0; bool gain1Ready=false; double gain2DC=0; double outputDC=0, followerDC=0; JoseArchitecture archActive=JoseArchitecture::Legacy; ColdBias biasActive=ColdBias::Native; CathodeBypass bypassActive=CathodeBypass::Native;
- double process(double input,double supply,double dt,PreampModel model,double gain,double bass,double mid,double treble,JoseEra era=JoseEra::Zener20,bool extraStage=true,double gain2=.7,JoseArchitecture arch=JoseArchitecture::Legacy,ColdBias bias=ColdBias::Native,CathodeBypass bypass=CathodeBypass::Native,RectoVoice recto=RectoVoice::EarlyRed,EVHVoice evh=EVHVoice::Blue,bool eco=false){
+ double process(double input,double supply,double dt,PreampModel model,double gain,double bass,double mid,double treble,JoseEra era=JoseEra::Zener20,bool extraStage=true,double gain2=.7,JoseArchitecture arch=JoseArchitecture::Legacy,ColdBias bias=ColdBias::Native,CathodeBypass bypass=CathodeBypass::Native,RectoVoice recto=RectoVoice::EarlyRed,EVHVoice evh=EVHVoice::Blue,bool eco=false,double volume=1.,bool postEQ=false){
  bool evhFamily=model==PreampModel::EVH5150III; if(!evhFamily)evh=model==PreampModel::EVHRed?EVHVoice::Red:EVHVoice::Blue; model=resolveEVH(model,evh);
  model=resolveRecto(model,recto);
  if(arch==JoseArchitecture::Legacy)arch=extraStage?JoseArchitecture::HBE:JoseArchitecture::Classic;
@@ -149,7 +150,7 @@ struct Preamp {
  auto p=model==PreampModel::Jose?joseSpec(arch,bias,bypass):(evhFamily?evhSpec(evh,bias,bypass):modifiedSpec(model,bias,bypass)); double v=input;
  for(int i=0;i<p.count;++i){
  bool first=i==p.gainAfter+1;
- bool second=model==PreampModel::Jose && arch!=JoseArchitecture::Stock && i==2;
+ bool second=model==PreampModel::Jose && arch!=JoseArchitecture::Stock && arch!=JoseArchitecture::Molecular && i==2;
  double pos=first?std::clamp(gain,0.,1.):second?std::clamp(gain2,0.,1.):1.;
  double bright=first&&(model==PreampModel::Marshall||(model==PreampModel::Jose&&arch==JoseArchitecture::Stock))?470e-12:0.;
  v=stages[i].process(v,supply,dt,p.stages[i],pos,bright,first||second,eco);
