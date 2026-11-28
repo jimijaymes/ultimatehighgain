@@ -154,3 +154,7 @@ Restore pre-0.3.26 previous-internal-sample secondary feedback in Standard and M
 
 ## 0.3.40 — Rectifier Modern presence routing
 Remove provisional 2.2 kHz differential PI attenuation in Standard, Economy and Max. Modern presence remains in the Rectifier preamp tone network; native Modern power stage remains open-loop independent of preamp voice. Mesa original and Multi-Watt manuals specify Modern presence moves to preamp and is inactive at FX return (https://mesa-boogie.imgix.net/media/User%20Manuals/3chRecto_multiWatt.pdf). This is a routing correction, not a verified component-level preamp schematic transcription. Build and listening verification pending.
+
+
+## 0.3.41 — Experimental Light power stage
+Append Light CPU choice, retaining existing indices. Standard path with bounded analytic Newton screen-current solve and original solver fallback; all other circuitry and load-line iterations unchanged. This is an initial reduced-cost solver, not a lookup table. Add standalone harmonic and timing comparison. Build and performance unverified.
