@@ -116,12 +116,15 @@ struct Engine {
  } if(!controls.benchDirect)v*=(controls.preamp==PreampModel::Marshall||(controls.preamp==PreampModel::Jose&&controls.joseArchitecture==JoseArchitecture::Stock))?audioPot(controls.master):controls.master*controls.master;
  
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
- // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
  if(controls.eco&&!controls.benchDirect&&!controls.inverterOnly)return economyClosedLoop(v,m,q,ps);
  const bool closed=!controls.disableFeedback&&!controls.inverterOnly&&m!=PowerModel::RectoModern&&m!=PowerModel::AC30;
  if(!closed)return detailedTrial(v,m,q,t,ps,cathodeBias,target,0.);
- // Restore pre-0.3.26 explicit feedback from the previous internal sample.
- return detailedTrial(v,m,q,t,ps,cathodeBias,target,fb);
+ // Same implicit bracketed feedback algorithm as Economy; replay physical state.
+ const auto oldPI=pi;const auto oldPresence=presenceNet;const auto oldGrid1=grid1,oldGrid2=grid2;
+ const double oldSupply=supply,oldScreen=screen,oldCath=cathodeV,oldMag=magI,oldFlux=flux,oldCap=capV,oldInd=indI,oldCoil=coilI,oldPeak=peakPlate,oldCut=cutState,oldModern=modernState;
+ auto trial=[&](double terminal){pi=oldPI;presenceNet=oldPresence;grid1=oldGrid1;grid2=oldGrid2;supply=oldSupply;screen=oldScreen;cathodeV=oldCath;magI=oldMag;flux=oldFlux;capV=oldCap;indI=oldInd;coilI=oldCoil;peakPlate=oldPeak;cutState=oldCut;modernState=oldModern;return detailedTrial(v,m,q,t,ps,cathodeBias,target,terminal);};
+ double lo=-4096.,hi=4096.,estimate=std::clamp(fb,lo,hi),fl=0.,fh=0.;bool haveL=false,haveH=false;
+ for(int k=0;k<32;++k){double y=trial(estimate);double f=fb-estimate;if(std::abs(f)<1e-5)return y;if(f>0){lo=estimate;fl=f;haveL=true;}else{hi=estimate;fh=f;haveH=true;}double next=haveL&&haveH?lo+(hi-lo)*fl/(fl-fh):std::clamp(estimate+f*.25,lo,hi);if(k%4==3||!(next>lo&&next<hi))next=(lo+hi)*.5;estimate=next;}return trial(estimate);
  }
  double detailedTrial(double v,PowerModel m,const Circuit& q,const TubeData& t,const PhaseInverterSpec& ps,bool cathodeBias,double target,double terminal){
  double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(terminal*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,coeff.presenceR,q.presenceC,nativeDepth(m,controls.evhVoice)?controls.resonance:0.);

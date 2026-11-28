@@ -162,3 +162,7 @@ Append Light CPU choice, retaining existing indices. Standard path with bounded 
 
 ## 0.3.42 — Factorised Light tube lookup
 Precompute normalized screen-loaded emission response (257 x 129 floats, approximately 130 KiB), shared across tube types; reconstruct plate and screen currents from the same emission and existing plate factors. Residual check and original solver fallback outside table accuracy/domain. Light-only safeguarded secant acceleration of primary load line; Standard bisection unchanged. No audio-thread table allocation. Build, harmonic accuracy and CPU improvement unverified. Feedback selector remains outstanding.
+
+
+## 0.3.43 — Common implicit feedback baseline
+Use Economy's 32-iteration bracketed feedback algorithm and tolerance for detailed Standard, Light and Max with complete trial state replay. Economy unchanged; native open-loop modes bypass solve. This can increase CPU substantially; build and convergence not yet verified. Previous-sample mode deferred to explicit comparison selector.
