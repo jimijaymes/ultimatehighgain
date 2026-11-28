@@ -20,6 +20,16 @@ jobs:
           name: UltimateHighGain-Windows-VST3
           path: build/UltimateHighGain_artefacts/Release/VST3/
           if-no-files-found: error
+      - name: Build paired CPU benchmark
+        run: cmake --build build --config Release --target paired_benchmark --parallel 4
+      - name: Run paired CPU benchmark
+        run: |
+          & build/Release/paired_benchmark.exe | Tee-Object -FilePath paired-benchmark.csv
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paired-benchmark
+          path: paired-benchmark.csv
       - name: Build standalone power diagnostics
         run: cmake --build build --config Release --target power_diagnostics --parallel 4
       - name: Run power diagnostics

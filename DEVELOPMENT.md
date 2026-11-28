@@ -130,3 +130,7 @@ Cache native preamp rail by model and supply switches. Try bracketed Illinois in
 
 ## 0.3.34 — Diagnostic workflow separation
 Build and upload VST3 before long diagnostics. Preserve all raw rows; classify only existing AC30 detailed-mode low-level THD+N failures separately from active failures. Nonfinite or missing fundamental still fails the executable. No additional DSP changes pending controlled timing comparison.
+
+
+## 0.3.35 — Paired Standard CPU benchmark
+Freeze exact v0.3.32 headers in baseline032 (namespace renamed only). Compare current Standard against baseline on same runner, alternating order, median of three, 48/96 kHz, three input amplitudes, all ten power models, report waveform relative RMS and peak error. VST3 uploaded first. No DSP changes. Benchmark does not certify full DAW CPU or all circuit settings.

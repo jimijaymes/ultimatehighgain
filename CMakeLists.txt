@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(UltimateHighGainDSP VERSION 0.3.34 LANGUAGES C CXX)
+project(UltimateHighGainDSP VERSION 0.3.35 LANGUAGES C CXX)
 add_executable(uhg_test test.cpp)
 target_compile_features(uhg_test PRIVATE cxx_std_17)
 enable_testing()
@@ -58,3 +58,6 @@ target_compile_features(calibration PRIVATE cxx_std_17)
 
 add_executable(power_diagnostics power_diagnostics.cpp)
 target_compile_features(power_diagnostics PRIVATE cxx_std_17)
+
+add_executable(paired_benchmark paired_benchmark.cpp)
+target_compile_features(paired_benchmark PRIVATE cxx_std_17)
