@@ -65,3 +65,6 @@ Remove artificial hard digital output clamp in both engines (host floating-point
 
 ## 0.3.15 — Physical voltage headroom
 Remove artificial +/-30 V PI input clamp in both engines; retain physical valve/load equations and input calibration. Apply -12 dB monitoring scaling only at each modeled signal output, including Economy; 100 W sine reference now -12 dBFS peak. Raw dry mode unchanged. Diagnostic reference voltages remain provisional. No change to feedback voltage or internal gain. Existing sessions may require output trim adjustment. Build/audio and low-level stability unverified.
+
+## 0.3.16 — Input/output diagnostic trims
+Input trim and Output use -24 to +24 dB, default 0 dB, double-click reset. Input before all modes, output after cabinet. Existing Output ID and normalized automation mapping retained; migrate old saved raw output values to dB. No changes to circuit engines. Block-rate gain changes; build/UI verification pending.
