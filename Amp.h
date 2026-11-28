@@ -44,6 +44,17 @@ struct Triode {
   double p=solve(grid);return p-lp(p,cap,12,dt);
  }
 };
+// Immutable factorised screen-loaded emission table. Effective overdrive U,
+// available screen S, and loading coefficient K absorb grid, plate and tube parameters.
+// Solve z + K*z*max(0,U+(z-S)/mu)^1.5 = S in normalized coordinates:
+// r=z/S, w=U/(S/mu), k=K*(S/mu)^1.5.
+struct LightEmissionTable {
+ static constexpr int W=257,K=129;
+ std::array<float,W*K> r{};
+ LightEmissionTable(){for(int j=0;j<K;++j){double k=std::expm1(j*std::log(65.)/(K-1));for(int i=0;i<W;++i){double w=16.*i/(W-1),lo=0,hi=1;for(int n=0;n<28;++n){double x=(lo+hi)*.5,u=std::max(0.,w+x-1.);if(x+k*x*u*std::sqrt(u)>1)hi=x;else lo=x;}r[j*W+i]=float((lo+hi)*.5);}}}
+ double get(double w,double k)const{double x=w*(W-1)/16.,y=std::log1p(k)*(K-1)/std::log(65.);int i=std::min(W-2,int(x)),j=std::min(K-2,int(y));double f=x-i,g=y-j;return (1-g)*(r[j*W+i]*(1-f)+r[j*W+i+1]*f)+g*(r[(j+1)*W+i]*(1-f)+r[(j+1)*W+i+1]*f);}
+};
+inline const LightEmissionTable lightEmission{};
 struct Engine {
  struct Prepared {double dt=0;PowerModel model=PowerModel::Marshall;bool tubeRect=false,spongy=false,valid=false;double target=0;double invRatio,magStep,invFlux,capG,invG,coilG,invDen,indStep,rs,supplyStep,invSupplyR,screenAlpha,feedbackScale,reflectedZ,screenDrop,cathDen;PhaseInverterSpec ps;double cutA=0,cutDen=0,modernAlpha=0,outputAlpha=0;double presence=-1,modernGain=0,presenceR=0;Tube tube=Tube::EL34;bool tubeValid=false;TubeData tubeData{};double share=0,ref=0,u0=0,plateRef=0,plateSlopeDen=0;}; Prepared coeff{};
  Circuit circuit; Controls controls; int oversampling=1; double fs=48000,dt=1./48000; Preamp preamp; PhaseInverter pi; GridCoupling grid1,grid2; double magI=0; PresenceNetwork presenceNet; double supply=450, screen=440,bias=-40, fb=0,fbLow=0,flux=0,leak=0,capV=0,indI=0,coilI=0, bassZ=0,trebleZ=0, prev=0,gridBlock=0; double sagCurrentSum=0, sagScreenSum=0; int sagCount=0; double debugPreamp=0; double outputDC=0; double screenEstimate1=440,screenEstimate2=440; double peakPlate=0,cathodeV=0,cutState=0,modernState=0; Tube active=Tube::EL34; bool ready=false; PowerModel activePower=PowerModel::Marshall;
@@ -124,7 +135,7 @@ struct Engine {
  struct Branch {double ip,is;};
  const double screenAvailable=std::max(0.,screen-cathodeV);
  const double gridBase1=coeff.u0+g1-t.vg,gridBase2=coeff.u0+g2-t.vg;
- auto branch=[&](double vp,double vg){const double plateV=vp-cathodeV;const double p=std::max(0.,plateV);const double expPlate=valveExp.get(p/t.knee);const double collect=1+2*expPlate;const double gridBase=vg==g1?gridBase1:gridBase2;auto emit=[&](double vs){double u=std::max(0.,gridBase+(vs-t.vs)/t.mu);return t.ia*(u/coeff.u0)*std::sqrt(u/coeff.u0);};double lastEmission=0.;auto screenAt=[&](double vs){lastEmission=emit(vs);return lastEmission*coeff.share*collect/coeff.ref*std::max(0.,vs)/t.vs;};if(controls.light){const double a=coeff.share*collect/coeff.ref/t.vs;const double u=std::max(0.,gridBase+(screenAvailable-t.vs)/t.mu);double z=screenAvailable;for(int j=0;j<3;++j){const double w=std::max(0.,gridBase+(z-t.vs)/t.mu);const double root=std::sqrt(w/coeff.u0);const double em=t.ia*(w/coeff.u0)*root;const double cur=a*z*em;const double derivative=a*(em+z*1.5*t.ia*root/(coeff.u0*t.mu));z=std::clamp(z-(z+q.screenR*cur-screenAvailable)/(1+q.screenR*derivative),0.,screenAvailable);}const double cur=screenAt(z);if(std::abs(z+q.screenR*cur-screenAvailable)<.05){return Branch{lastEmission*(1-expPlate)/coeff.plateRef*std::max(0.,1+(p-t.va)/coeff.plateSlopeDen),cur};}}double low=0,high=screen,fl=-screen,fh=screenAt(screenAvailable)*q.screenR;double vs=screen,lastScreenCurrent=0;for(int j=0;j<(controls.eco?3:6);++j){vs=(fh>fl)?low+(high-low)*(-fl)/(fh-fl):low;lastScreenCurrent=screenAt(std::max(0.,vs-cathodeV));double f=vs+lastScreenCurrent*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}const double knee=(1-expPlate)/coeff.plateRef;const double slope=std::max(0.,1+(p-t.va)/coeff.plateSlopeDen);return Branch{lastEmission*knee*slope,lastScreenCurrent};};
+ auto branch=[&](double vp,double vg){const double plateV=vp-cathodeV;const double p=std::max(0.,plateV);const double expPlate=valveExp.get(p/t.knee);const double collect=1+2*expPlate;const double gridBase=vg==g1?gridBase1:gridBase2;auto emit=[&](double vs){double u=std::max(0.,gridBase+(vs-t.vs)/t.mu);return t.ia*(u/coeff.u0)*std::sqrt(u/coeff.u0);};double lastEmission=0.;auto screenAt=[&](double vs){lastEmission=emit(vs);return lastEmission*coeff.share*collect/coeff.ref*std::max(0.,vs)/t.vs;};if(controls.light&&screenAvailable>1e-6){const double a=coeff.share*collect/coeff.ref/t.vs;const double scale=screenAvailable/t.mu;const double w=(gridBase+(screenAvailable-t.vs)/t.mu)/scale;const double k=q.screenR*a*t.ia*std::pow(scale/coeff.u0,1.5);if(w<=0)return Branch{0.,0.};if(w<=16&&k>=0&&k<=64){double z=screenAvailable*lightEmission.get(w,k);const double cur=screenAt(z);if(std::abs(z+q.screenR*cur-screenAvailable)<.05)return Branch{lastEmission*(1-expPlate)/coeff.plateRef*std::max(0.,1+(p-t.va)/coeff.plateSlopeDen),cur};}}double low=0,high=screen,fl=-screen,fh=screenAt(screenAvailable)*q.screenR;double vs=screen,lastScreenCurrent=0;for(int j=0;j<(controls.eco?3:6);++j){vs=(fh>fl)?low+(high-low)*(-fl)/(fh-fl):low;lastScreenCurrent=screenAt(std::max(0.,vs-cathodeV));double f=vs+lastScreenCurrent*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}const double knee=(1-expPlate)/coeff.plateRef;const double slope=std::max(0.,1+(p-t.va)/coeff.plateSlopeDen);return Branch{lastEmission*knee*slope,lastScreenCurrent};};
  // Implicit quasi-static primary load line; speaker dynamic state remains explicit.
  const double loadHistory=coeff.capG*capV-indI;
  const double reflectedHistory=controls.benchResistive?0.:(loadHistory*coeff.invG-coeff.coilG*coilI)/coeff.invRatio;
@@ -135,7 +146,7 @@ struct Engine {
  Branch cachedA{},cachedB{};double cachedV=0;bool cached=false;
  auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);cachedA=a;cachedB=b;cachedV=v;cached=true;return ((a.ip-b.ip)*q.pairs*.5-magI/magDen+reflectedHistory/loadZ)*reflectedZ-v;};
  double primaryV=0;
- for(int k=0;k<24;++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.00001){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
+ double trialV=(lo+hi)*.5,oldV=0.,oldF=0.;for(int k=0;k<24;++k){double v=trialV;double f=residual(v);if(std::abs(f)<.00001){lo=hi=v;break;}if(f>0)lo=v;else hi=v;trialV=(lo+hi)*.5;if(controls.light&&k>0&&k%4!=3&&f!=oldF){double next=v-f*(v-oldV)/(f-oldF);if(next>lo&&next<hi)trialV=next;}oldV=v;oldF=f;}
  primaryV=(lo+hi)*.5;const bool reuse=cached&&cachedV==primaryV;auto a1=reuse?cachedA:branch(supply-primaryV*.5,g1),a2=reuse?cachedB:branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
  double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/coeff.cathDen,0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;

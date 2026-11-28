@@ -157,3 +157,7 @@ Remove provisional 2.2 kHz differential PI attenuation in Standard, Economy and 
 
 ## 0.3.41 — Experimental Light power stage
 Append Light CPU choice, retaining existing indices. Standard path with bounded analytic Newton screen-current solve and original solver fallback; all other circuitry and load-line iterations unchanged. This is an initial reduced-cost solver, not a lookup table. Add standalone harmonic and timing comparison. Build and performance unverified.
+
+
+## 0.3.42 — Factorised Light tube lookup
+Precompute normalized screen-loaded emission response (257 x 129 floats, approximately 130 KiB), shared across tube types; reconstruct plate and screen currents from the same emission and existing plate factors. Residual check and original solver fallback outside table accuracy/domain. Light-only safeguarded secant acceleration of primary load line; Standard bisection unchanged. No audio-thread table allocation. Build, harmonic accuracy and CPU improvement unverified. Feedback selector remains outstanding.
