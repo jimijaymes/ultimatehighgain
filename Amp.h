@@ -78,7 +78,7 @@ struct Engine {
  coeff.valid=true;coeff.dt=dt;coeff.model=m;coeff.tubeRect=controls.tubeRect;coeff.spongy=controls.spongy;
  auto chosen=controls.autoTube?(m==PowerModel::EVH&&controls.evhVoice==EVHVoice::BlueEL34?Tube::EL34:nativeTube(m)):controls.tube;
  if(!coeff.tubeValid||coeff.tube!=chosen){coeff.tubeValid=true;coeff.tube=chosen;coeff.tubeData=data(chosen);const auto& t=coeff.tubeData;coeff.share=t.is/t.ia;coeff.ref=1+2*valveExp.get(t.va/t.knee);coeff.u0=1.5*t.ia/t.gm;coeff.plateRef=1-valveExp.get(t.va/t.knee);coeff.plateSlopeDen=t.rp*t.ia;}
- const auto& t=coeff.tubeData;const auto& ps=coeff.ps;bool cathodeBias=m==PowerModel::AC30;double target=coeff.target;if(!ready||active!=chosen){bias=biasFor(t,target,q.screen*target/q.B);cathodeV=cathodeBias?-bias:0;grid1.charge=cathodeBias?0:-bias;grid2.charge=grid1.charge;active=chosen;ready=true;}
+ const auto& t=coeff.tubeData;const auto& ps=coeff.ps;bool cathodeBias=m==PowerModel::AC30;double target=coeff.target;if(!ready||active!=chosen){auto biasData=t;if(m==PowerModel::VHT&&chosen==Tube::EL34)biasData.idle=.035;bias=biasFor(biasData,target,q.screen*target/q.B);cathodeV=cathodeBias?-bias:0;grid1.charge=cathodeBias?0:-bias;grid2.charge=grid1.charge;active=chosen;ready=true;}
  // 0 dBu = .775 Vrms; -14 dBFS sine = .1995 peak.
  double v=x*5.493063;
  if(!controls.powerOnly){
@@ -151,7 +151,7 @@ struct Engine {
  const double low=lp(v,economyLow,m==PowerModel::AC30?65.:35.,dt);
  const double ac=v-low;
  // Approximate class-AB full drive: differential grid peak ~= twice idle bias.
- const double watts=m==PowerModel::VHT?120.:m==PowerModel::AC30?30.:m==PowerModel::MiniRecto?25.:m==PowerModel::AC50?50.:100.;
+ const double watts=m==PowerModel::VHT?(active==Tube::EL34?100.:120.):m==PowerModel::AC30?30.:m==PowerModel::MiniRecto?25.:m==PowerModel::AC50?50.:100.;
  const double gridPeak=2*std::max(5.,std::abs(bias));
  const double drive=ac*(std::sqrt(2*q.load*watts)/gridPeak)*(1+damping);
  constexpr double L=.018,w=6.283185307*95.;
