@@ -19,5 +19,11 @@ int main(){
  std::cout<<model<<" eco="<<eco<<" idle="<<idle<<" signal="<<signal<<" tail="<<tail<<" seconds="<<seconds<<std::endl;
  if(idle>.001||signal<.00001||tail>.001)ok=false;
  }
+ // Additional isolation measurements, without replacing the original pass criteria.
+ for(bool eco:{false,true})for(bool powerOnly:{false,true})for(bool nofb:{false,true}){
+ uhg::Engine e;e.controls.linkPower=false;e.controls.power=uhg::PowerModel::Marshall;e.controls.eco=eco;e.controls.powerOnly=powerOnly;e.controls.disableFeedback=nofb;e.prepare(48000);double idle=0,tail=0,signal=0;
+ for(int n=0;n<48000;++n){double x=n>=12000&&n<24000?.04*std::sin(6.283185307*220*n/48000.):0.;double y=e.process(x);if(!std::isfinite(y))ok=false;if(n>=10000&&n<12000)idle+=y*y;if(n>=14000&&n<24000)signal+=y*y;if(n>=46000)tail+=y*y;}
+ std::cout<<"Marshall isolation eco="<<eco<<" powerOnly="<<powerOnly<<" nofb="<<nofb<<" idle="<<std::sqrt(idle/2000)<<" signal="<<std::sqrt(signal/10000)<<" tail="<<std::sqrt(tail/2000)<<" rail="<<e.supply<<std::endl;
+ }
  return ok?0:1;
 }

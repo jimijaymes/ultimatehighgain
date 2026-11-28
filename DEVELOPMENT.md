@@ -106,3 +106,7 @@ Rename detailed feedback solver local x to feedbackEstimate in Standard and Max 
 
 ## 0.3.28 — Shared regression correction
 Compare resolved and family Rectifier models with identical explicit voice and controls; extend exact equivalence to all twelve voices. Print failing shared combination without changing thresholds. No DSP changes; Marshall stability remains unresolved. Build pending.
+
+
+## 0.3.29 — Experimental Marshall stability test 1
+Standard/Max Marshall power model feeds preamp from a 5 Hz first-order decoupled supply state rather than instantaneous output-stage B+. This is a provisional RC-equivalent isolation experiment, not a measured circuit fit; slow sag retained, no valve or feedback values changed. Economy uses the same routing but its supply is static. Add full/power-only, feedback on/off and Economy/Standard isolation measurements to stability test; original pass criteria unchanged. Build and efficacy unverified. AC30 unresolved.
