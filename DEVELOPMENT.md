@@ -122,3 +122,7 @@ Apply spongy (0.85 native B+) and tube rectifier (20 V upstream drop) to each pr
 
 ## 0.3.32 — Experimental Max linked supply
 Max full amp linked mode filters upstream power-stage droop through provisional 10k/22uF RC (220ms), backward Euler, once per sample outside feedback trials; scales native preamp rail by filtered fractional droop. Unlinked, power-only, preamp-only and Economy/Standard remain independent. Add Max linked/unlinked Marshall stability and sag measurements using existing thresholds. Not a full per-node supply network; RC provisional, no guarantee of oscillation elimination; build pending.
+
+
+## 0.3.33 — Standard optimisation experiment 1
+Cache native preamp rail by model and supply switches. Try bracketed Illinois interpolation for primary load line, accepting only original 1e-5 residual; otherwise replay original 24-step bisection with unchanged bracket. AC30 excluded pending low-level investigation. Max unchanged. No signal-dependent precision or iteration cap reduction. CPU and waveform equivalence pending diagnostics; further screen, PI and preamp solver changes deferred until this isolated experiment is measured.

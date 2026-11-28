@@ -52,7 +52,11 @@ struct Engine {
  void prepare(double rate){fs=rate;dt=1/(oversampling*fs);reset();}
  void reset(){sagCurrentSum=sagScreenSum=0;sagCount=0;preamp={};pi={};grid1={};grid2={};magI=0;presenceNet={};supply=circuit.B;screen=circuit.screen;fb=fbLow=flux=leak=capV=indI=coilI=bassZ=trebleZ=prev=gridBlock=peakPlate=0;active=controls.tube;outputDC=cathodeV=cutState=modernState=0;ready=false;economyLow=economyHigh=economyCap=economyInd=economyCoil=0;}
  double biasFor(TubeData t,double v,double s){double lo=-200,hi=0;double target=std::min(t.idle,.65*t.rating/std::max(1.,v));for(int i=0;i<32;++i){double m=(lo+hi)*.5;if(plate(t,v,m,s)>target)hi=m;else lo=m;}return (lo+hi)*.5;}
+ mutable bool railValid=false,railSpongy=false,railRect=false;
+ mutable PreampModel railModel=PreampModel::Marshall;
+ mutable double railValue=0.;
  double preampSupply() const {
+ if(railValid&&railModel==controls.preamp&&railSpongy==controls.spongy&&railRect==controls.tubeRect)return railValue;
  // Independent nominal preamp rail; preserve native family voltage anchors.
  PowerModel native=PowerModel::Marshall;
  switch(controls.preamp){
@@ -62,7 +66,8 @@ struct Engine {
  case PreampModel::EVHBlue:case PreampModel::EVHRed:case PreampModel::EVH5150III:native=PowerModel::EVH;break;
  default:break;
  }
- return (powerCircuit(native).B*(controls.spongy?.85:1.)-(controls.tubeRect?20.:0.))*(isRecto(controls.preamp)?.90:.65);
+ railModel=controls.preamp;railSpongy=controls.spongy;railRect=controls.tubeRect;railValid=true;
+ return railValue=(powerCircuit(native).B*(controls.spongy?.85:1.)-(controls.tubeRect?20.:0.))*(isRecto(controls.preamp)?.90:.65);
  }
 
  double step(double x){auto m=selectedPower();if(m!=activePower){circuit=powerCircuit(m);activePower=m;reset();}auto &q=circuit;
@@ -133,7 +138,10 @@ struct Engine {
  Branch cachedA{},cachedB{};double cachedV=0;bool cached=false;
  auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);cachedA=a;cachedB=b;cachedV=v;cached=true;return ((a.ip-b.ip)*q.pairs*.5-magI/magDen+reflectedHistory/loadZ)*reflectedZ-v;};
  double primaryV=0;
- for(int k=0;k<24;++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.00001){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
+ // Try a bracketed interpolation at full original precision; otherwise replay original bisection.
+ // AC30 retains original solver pending low-level diagnostic investigation.
+ if(m!=PowerModel::AC30){double l=lo,h=hi,fl=residual(l),fh=residual(h);if(fl>0&&fh<0){for(int k=0;k<8;++k){double v=l+(h-l)*fl/(fl-fh);if(!(v>l&&v<h))break;double f=residual(v);if(std::abs(f)<.00001){lo=hi=v;break;}if(f>0){l=v;fl=f;fh*=.5;}else{h=v;fh=f;fl*=.5;}}}}
+ if(lo!=hi)for(int k=0;k<24;++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.00001){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
  primaryV=(lo+hi)*.5;const bool reuse=cached&&cachedV==primaryV;auto a1=reuse?cachedA:branch(supply-primaryV*.5,g1),a2=reuse?cachedB:branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
  double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/coeff.cathDen,0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
