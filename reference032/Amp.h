@@ -92,11 +92,8 @@ struct Engine {
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
  const bool closed=!controls.disableFeedback&&!controls.inverterOnly&&m!=PowerModel::RectoModern&&m!=PowerModel::AC30;
  if(!closed)return detailedTrial(v,m,q,t,ps,cathodeBias,target,0.);
- const auto oldPI=pi;const auto oldPresence=presenceNet;const auto oldGrid1=grid1,oldGrid2=grid2;
- const double oldSupply=supply,oldScreen=screen,oldCath=cathodeV,oldMag=magI,oldFlux=flux,oldCap=capV,oldInd=indI,oldCoil=coilI,oldPeak=peakPlate,oldCut=cutState,oldModern=modernState;
- auto trial=[&](double terminal){pi=oldPI;presenceNet=oldPresence;grid1=oldGrid1;grid2=oldGrid2;supply=oldSupply;screen=oldScreen;cathodeV=oldCath;magI=oldMag;flux=oldFlux;capV=oldCap;indI=oldInd;coilI=oldCoil;peakPlate=oldPeak;cutState=oldCut;modernState=oldModern;return detailedTrial(v,m,q,t,ps,cathodeBias,target,terminal);};
- double lo=-512.,hi=512.,feedbackEstimate=std::clamp(fb,lo,hi),fl=0.,fh=0.;bool haveL=false,haveH=false;
- for(int k=0;k<40;++k){double y=trial(feedbackEstimate),f=fb-feedbackEstimate;if(std::abs(f)<.0001)return y;if(f>0){lo=feedbackEstimate;fl=f;haveL=true;}else{hi=feedbackEstimate;fh=f;haveH=true;}double next=haveL&&haveH?lo+(hi-lo)*fl/(fl-fh):feedbackEstimate+f*.25;if(k%4==3||!(next>lo&&next<hi))next=(lo+hi)*.5;feedbackEstimate=next;}return trial(feedbackEstimate);
+ // Restore pre-0.3.26 explicit feedback from the previous internal sample.
+ return detailedTrial(v,m,q,t,ps,cathodeBias,target,fb);
  }
  double detailedTrial(double v,PowerModel m,const Circuit& q,const TubeData& t,const PhaseInverterSpec& ps,bool cathodeBias,double target,double terminal){
  double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(terminal*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC,nativeDepth(m,controls.evhVoice)?controls.resonance:0.);

@@ -146,3 +146,7 @@ Add independent AC30 bench comparing 0.5, 2 and 5 seconds warmup, silence/1/10 m
 
 ## 0.3.38 — Standard negative feedback convergence experiment
 Add safeguarded secant predictor to the detailed global feedback root solve, preserving the 0.0001 residual tolerance and original 40-iteration fallback from identical initial state. No changes to open-loop, AC30, Rectifier Modern, Economy, Max or preamp. User reports real-time dropouts with feedback enabled; verify paired waveform and timing before accepting. Worst-case fallback adds up to seven trial evaluations; not a guaranteed real-time fix.
+
+
+## 0.3.39 — Restore explicit detailed negative feedback
+Restore pre-0.3.26 previous-internal-sample secondary feedback in Standard and Max, removing global iterative rollback and 0.3.38 predictor. Retain current detailed forward circuit, primary precision, supply isolation/linking, Economy and native open-loop paths. User reports feedback-enabled host CPU overload. One forward evaluation per internal sample; explicit delay can reintroduce instability, so verify diagnostics and host before acceptance. Baseline032 unchanged.
