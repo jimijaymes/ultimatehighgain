@@ -69,10 +69,10 @@ struct Engine {
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
  double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC);
- double d1,d2;pi.process(clamp(v,-30.,30.),controls.inverterOnly?0.:feedback,supply*.72,dt,d1,d2,ps,controls.eco);if(controls.inverterOnly)return (d1-d2)/100.;
+ double d1,d2;if(controls.inverterOnly){pi.process(clamp(v,-30.,30.),0.,supply*.72,dt,d1,d2,ps,controls.eco);return (d1-d2)/100.;}pi.loaded(clamp(v,-30.,30.),feedback,supply*.72,dt,cathodeBias?0:bias,cathodeV,grid1.charge,grid2.charge,d1,d2,ps,false);
  if(m==PowerModel::AC30){double diff=d1-d2;double r=1000.+250000.*(1-controls.presence);double sourceR=100000.;double a=dt/4.7e-9;double i=(diff-cutState)/(r+sourceR+a);cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
  if(m==PowerModel::RectoModern&&!isRecto(controls.preamp)){double diff=d1-d2;double high=diff-lp(diff,modernState,2200,dt);double atten=.65*(1-controls.presence)*high;d1-=atten*.5;d2+=atten*.5;}
- double g1=grid1.process(d1,cathodeBias?0:bias,dt,ps)-cathodeV,g2=grid2.process(d2,cathodeBias?0:bias,dt,ps)-cathodeV;
+ double g1=grid1.process(d1,cathodeBias?0:bias,dt,ps,cathodeV)-cathodeV,g2=grid2.process(d2,cathodeBias?0:bias,dt,ps,cathodeV)-cathodeV;
 
  // Solve plate/screen current against the same instantaneous reflected voltage.
  struct Branch {double ip,is;};
