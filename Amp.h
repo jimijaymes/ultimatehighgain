@@ -142,10 +142,11 @@ struct Engine {
  economyCap=z*(current+hist);economyInd+=gl*economyCap;economyCoil=current;
  return (drive-rs*current)/std::sqrt(2.*q.load*100.);
  }
- double processPreampOnly(double x){double v=x*(.775*std::sqrt(2.)/std::pow(10.,-14./20.));
- v=preamp.process(v,powerCircuit(selectedPower()).B*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence);
+ double preampOnlyStep(double x){double v=x*(.775*std::sqrt(2.)/std::pow(10.,-14./20.));
+ v=preamp.process(v,(powerCircuit(selectedPower()).B*(controls.spongy?.85:1.)-(controls.tubeRect?20.:0.))*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence);
  if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
  return v/30.;}
- double process(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j){double y=step(prev+(x-prev)*j/oversampling);if(!std::isfinite(y)){reset();return 0;}out+=y;}prev=x;double y=out/oversampling;outputDC+=coeff.outputAlpha*(y-outputDC);return std::clamp(y-outputDC,-1.,1.);}
+ double processPreampOnly(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j)out+=preampOnlyStep(prev+(x-prev)*j/oversampling);prev=x;return out/oversampling;}
+ double process(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j){double y=step(prev+(x-prev)*j/oversampling);if(!std::isfinite(y)){reset();return 0;}out+=y;}prev=x;double y=out/oversampling;outputDC+=coeff.outputAlpha*(y-outputDC);return y-outputDC;}
 };
 }

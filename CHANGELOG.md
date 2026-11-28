@@ -59,3 +59,6 @@ Economy full/power-only uses a linear voltage source with model-dependent dampin
 
 ## 0.3.13 — Economy retains nonlinear phase inverter
 Move Economy bypass after PI and model-specific PI voicing, before grid coupling. Retain PI clipping and master drive. Linear downstream reactive load uses provisional differential PI scaling (0.1); explicit global feedback disabled in Economy, represented by damping approximation instead. Standard/Max and cabinet routing unchanged. Build and gain calibration pending.
+
+## 0.3.14 — Gain staging diagnostics
+Remove artificial hard digital output clamp in both engines (host floating-point output retains headroom; output trim remains). Preamp-only uses same oversampling interpolation and nominal rectifier/spongy supply settings as full amp. No interstage attenuation or clipping threshold changes. Full amp preamp voltage may legitimately exceed direct input; actual PI sensitivity and output references remain uncalibrated. Standard/Max low-level fault unresolved. Build pending.
