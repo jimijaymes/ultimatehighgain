@@ -17,3 +17,6 @@ Read this first on resuming work; verify relevant source before edits. Update th
 ## 0.3.1 development
 - Standard solver reuses final screen current and converged branch results (2186c534 and subsequent screen reuse commit). No altered solver tolerances, iterations or circuit values. Economy remains the 0.3.0 reference. Shared reactive history expression reused without changing arithmetic.
 - Pending: build, sample-by-sample comparison against 0.3.0 and CPU benchmark. Do not claim measured speedup or bit identity before testing.
+
+## 0.3.2 development
+- Both modes now reuse identical redundant evaluations. Economy retains 12 primary, 3 screen and 14 outer PI iterations; Standard retains 16, 6 and 20. No further Economy accuracy reductions until user listening tests. Build, null and CPU benchmarks pending.
