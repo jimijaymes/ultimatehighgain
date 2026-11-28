@@ -102,3 +102,7 @@ Uploaded 252-row diagnostic: Economy stable and open-loop gain within 0.32dB; St
 
 ## 0.3.27 — Build correction
 Rename detailed feedback solver local x to feedbackEstimate in Standard and Max to resolve MSVC C2082. No DSP behavior changes. Build pending.
+
+
+## 0.3.28 — Shared regression correction
+Compare resolved and family Rectifier models with identical explicit voice and controls; extend exact equivalence to all twelve voices. Print failing shared combination without changing thresholds. No DSP changes; Marshall stability remains unresolved. Build pending.
