@@ -118,3 +118,7 @@ Replace 0.3.29 Marshall-only filtered B+ with independent nominal preamp-family 
 
 ## 0.3.31 — Shared supply controls, independent rails
 Apply spongy (0.85 native B+) and tube rectifier (20 V upstream drop) to each preamp's native nominal supply before existing family scaling. Power stage retains independent target and dynamic sag. Test all four switch combinations for eleven preamp models, exact output independence across power models, and lower preamp rail with either switch. Values remain provisional existing approximations; no shared dynamic sag. Build pending.
+
+
+## 0.3.32 — Experimental Max linked supply
+Max full amp linked mode filters upstream power-stage droop through provisional 10k/22uF RC (220ms), backward Euler, once per sample outside feedback trials; scales native preamp rail by filtered fractional droop. Unlinked, power-only, preamp-only and Economy/Standard remain independent. Add Max linked/unlinked Marshall stability and sag measurements using existing thresholds. Not a full per-node supply network; RC provisional, no guarantee of oscillation elimination; build pending.

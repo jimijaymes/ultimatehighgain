@@ -1,3 +1,4 @@
+#include "reference032/Amp.h"
 #include "Amp.h"
 #include <iostream>
 #include <chrono>
@@ -31,6 +32,11 @@ int main(){
  a.controls.linkPower=b.controls.linkPower=false;a.controls.power=uhg::PowerModel::Marshall;b.controls.power=uhg::PowerModel::AC30;a.controls.spongy=b.controls.spongy=spongy;a.controls.tubeRect=b.controls.tubeRect=rect;a.prepare(48000);b.prepare(48000);
  double rail=a.preampSupply();a.controls.spongy=false;a.controls.tubeRect=false;double normal=a.preampSupply();a.controls.spongy=spongy;a.controls.tubeRect=rect;if(rail!=b.preampSupply()||((spongy||rect)?!(rail<normal):rail!=normal)){std::cerr<<"Preamp rail control mismatch model="<<p<<std::endl;ok=false;}
  for(int n=0;n<2400;++n){double x=.04*std::sin(n*.0576);double y=a.processPreampOnly(x),z=b.processPreampOnly(x);if(!std::isfinite(y)||!std::isfinite(z)||y!=z){std::cerr<<"Independent preamp rail mismatch model="<<p<<" sample="<<n<<std::endl;ok=false;break;}}
+ }
+ // Max linked versus unlinked full amp stability, including filtered supply state.
+ for(bool linked:{false,true}){uhg_max032::Engine e;e.controls.linkPower=linked;e.controls.power=uhg_max032::PowerModel::Marshall;e.prepare(48000);double idle=0,tail=0,signal=0,maxSag=0;
+ for(int n=0;n<48000;++n){double x=n>=12000&&n<24000?.04*std::sin(6.283185307*220*n/48000.):0.;double y=e.process(x);if(!std::isfinite(y)||!std::isfinite(e.sharedSag)||(!linked&&e.sharedSag!=0.))ok=false;if(n>=10000&&n<12000)idle+=y*y;if(n>=14000&&n<24000)signal+=y*y;if(n>=46000)tail+=y*y;maxSag=std::max(maxSag,e.sharedSag);}
+ idle=std::sqrt(idle/2000);signal=std::sqrt(signal/10000);tail=std::sqrt(tail/2000);std::cout<<"Max Marshall linked="<<linked<<" idle="<<idle<<" signal="<<signal<<" tail="<<tail<<" maxSag="<<maxSag<<std::endl;if(idle>.001||signal<.00001||tail>.001)ok=false;
  }
  return ok?0:1;
 }

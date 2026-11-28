@@ -50,7 +50,8 @@ struct Engine {
  PowerModel selectedPower() const {if(!controls.linkPower)return controls.power; switch(controls.preamp){case PreampModel::Peavey5150:return PowerModel::Peavey;case PreampModel::DualRectifier:return rectoModern(controls.rectoVoice)?PowerModel::RectoModern:PowerModel::RectoVintage;case PreampModel::VHT:return PowerModel::VHT;case PreampModel::EVH5150III:return PowerModel::EVH;default:return PowerModel::Marshall;}}
 
  void prepare(double rate){fs=rate;dt=1/(oversampling*fs);reset();}
- void reset(){sagCurrentSum=sagScreenSum=0;sagCount=0;preamp={};pi={};grid1={};grid2={};magI=0;presenceNet={};supply=circuit.B;screen=circuit.screen;fb=fbLow=flux=leak=capV=indI=coilI=bassZ=trebleZ=prev=gridBlock=peakPlate=0;active=controls.tube;outputDC=cathodeV=cutState=modernState=0;ready=false;}
+ double sharedSag=0.;
+ void reset(){sharedSag=0.;sagCurrentSum=sagScreenSum=0;sagCount=0;preamp={};pi={};grid1={};grid2={};magI=0;presenceNet={};supply=circuit.B;screen=circuit.screen;fb=fbLow=flux=leak=capV=indI=coilI=bassZ=trebleZ=prev=gridBlock=peakPlate=0;active=controls.tube;outputDC=cathodeV=cutState=modernState=0;ready=false;}
  double biasFor(TubeData t,double v,double s){double lo=-200,hi=0;double target=std::min(t.idle,.65*t.rating/std::max(1.,v));for(int i=0;i<32;++i){double m=(lo+hi)*.5;if(plate(t,v,m,s)>target)hi=m;else lo=m;}return (lo+hi)*.5;}
  double preampSupply() const {
  // Independent nominal preamp rail; preserve native family voltage anchors.
@@ -80,8 +81,11 @@ struct Engine {
  auto chosen=controls.autoTube?(m==PowerModel::EVH&&controls.evhVoice==EVHVoice::BlueEL34?Tube::EL34:nativeTube(m)):controls.tube;auto t=data(chosen);auto ps=inverterSpec(m);bool cathodeBias=m==PowerModel::AC30;double target=q.B*(controls.spongy?.85:1.)-(controls.tubeRect?20:0);if(!ready||active!=chosen){auto biasData=t;if(m==PowerModel::VHT&&chosen==Tube::EL34)biasData.idle=.035;bias=biasFor(biasData,target,q.screen*target/q.B);cathodeV=cathodeBias?-bias:0;grid1.charge=cathodeBias?0:-bias;grid2.charge=grid1.charge;active=chosen;ready=true;}
  // 0 dBu = .775 Vrms; -14 dBFS sine = .1995 peak.
  double v=x*5.493063;
+ // Max only: filtered upstream droop, updated once per accepted sample, never per feedback trial.
+ if(controls.linkPower&&!controls.eco&&!controls.powerOnly){const double droop=std::clamp(target-supply,0.,target*.55);const double h=dt/(10000.*22e-6);sharedSag=(sharedSag+h*droop)/(1+h);}else sharedSag=0.;
  if(!controls.powerOnly){
- v=preamp.process(v,preampSupply(),dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence,controls.pittHi,controls.pittBoost,controls.pittEdge,controls.pittShift);
+ const double rail=preampSupply()*(1-sharedSag/std::max(1.,target));
+ v=preamp.process(v,rail,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence,controls.pittHi,controls.pittBoost,controls.pittEdge,controls.pittShift);
  if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
  } if(!controls.benchDirect)v*=(controls.preamp==PreampModel::Marshall||(controls.preamp==PreampModel::Jose&&controls.joseArchitecture==JoseArchitecture::Stock))?audioPot(controls.master):controls.master*controls.master;
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
