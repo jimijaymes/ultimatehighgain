@@ -95,3 +95,6 @@ Fryette G100UL manual confirms parallel input triodes, optional third lead stage
 
 ## 0.3.25 — Pittbull EL34 configuration
 Manual EL34 selection retains Pittbull topology and depth, uses provisional 35mA idle target subject to existing dissipation cap and 100W Economy rating instead of 120W. CLX is native EL34 reference, not an Ultra-Lead factory EL34 switch. Exact CLX transformer, rail, driver and bias values remain unverified; shared circuit retained. No graphic EQ. Sources: https://www.fryette.com/support-faqs/ ; https://www.fryette.com/content/G100UL_SFD.pdf . Build/audio unverified.
+
+## 0.3.26 — Detailed feedback stabilization
+Uploaded 252-row diagnostic: Economy stable and open-loop gain within 0.32dB; Standard/Max Vintage silent output 55.216V. Solve instantaneous feedback with rollback of PI, coupling, supply and reactive states per trial in both detailed engines. Increase primary solve precision. Expand diagnostics to all ten power models, all CPU modes, representative presence/depth/supply settings and valve overrides; exclude above-Nyquist harmonics, longer settling, flag silence and low-level distortion. Diagnostic failure remains visible but permits VST3 build for audition. Not compiled or measured yet; CPU and convergence risks remain. No valve curve changes.

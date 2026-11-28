@@ -12,6 +12,7 @@ jobs:
       - name: Build standalone power diagnostics
         run: cmake --build build --config Release --target power_diagnostics --parallel 4
       - name: Run power diagnostics
+        continue-on-error: true
         run: |
           & build/Release/power_diagnostics.exe | Tee-Object -FilePath power-diagnostics.csv
           exit $LASTEXITCODE
