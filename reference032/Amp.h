@@ -32,7 +32,7 @@ case PowerModel::SLO: q.B=500;q.screen=480;q.primary=1900;q.feedbackR=39000;q.re
 default: break;}return q;}
 inline Tube nativeTube(PowerModel m){switch(m){case PowerModel::AC30:case PowerModel::MiniRecto:return Tube::EL84;case PowerModel::Peavey:case PowerModel::RectoVintage:case PowerModel::RectoModern:case PowerModel::VHT:case PowerModel::EVH:case PowerModel::SLO:return Tube::L6;default:return Tube::EL34;}}
 inline PhaseInverterSpec inverterSpec(PowerModel m){PhaseInverterSpec p;switch(m){case PowerModel::RectoVintage:case PowerModel::RectoModern:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::AC30:p.plate1=100000;p.plate2=100000;p.tail=48200;p.biasR=1200;p.coupling=150e-9;p.gridStop=1500;break;case PowerModel::MiniRecto:case PowerModel::Peavey:case PowerModel::EVH:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::VHT:case PowerModel::SLO:p.coupling=100e-9;p.gridStop=2200;break;default:break;}return p;}
-struct Controls {bool disableFeedback=false;bool inverterOnly=false;bool eco=false;bool autoTube=true;bool linkPower=true; PowerModel power=PowerModel::Marshall;double presence=.5, gain=.5, master=.25, bass=.5, mid=.5, treble=.5; bool spongy=false,tubeRect=false; Tube tube=Tube::EL34; PreampModel preamp=PreampModel::Marshall; JoseEra joseEra=JoseEra::Zener20; bool joseExtraStage=true; double joseGain2=.7; double volume=1.; bool josePostEQ=false; bool joseSAT=false; int brightMode=1; JoseArchitecture joseArchitecture=JoseArchitecture::Legacy; ColdBias joseBias=ColdBias::Native; CathodeBypass joseBypass=CathodeBypass::Native; ColdBias coldBias=ColdBias::Native; CathodeBypass coldBypass=CathodeBypass::Native; RectoVoice rectoVoice=RectoVoice::EarlyRed; EVHVoice evhVoice=EVHVoice::Blue;};
+struct Controls {bool disableFeedback=false;bool inverterOnly=false;bool powerOnly=false;bool eco=false;bool autoTube=true;bool linkPower=true; PowerModel power=PowerModel::Marshall;double presence=.5, gain=.5, master=.25, bass=.5, mid=.5, treble=.5; bool spongy=false,tubeRect=false; Tube tube=Tube::EL34; PreampModel preamp=PreampModel::Marshall; JoseEra joseEra=JoseEra::Zener20; bool joseExtraStage=true; double joseGain2=.7; double volume=1.; bool josePostEQ=false; bool joseSAT=false; int brightMode=1; JoseArchitecture joseArchitecture=JoseArchitecture::Legacy; ColdBias joseBias=ColdBias::Native; CathodeBypass joseBypass=CathodeBypass::Native; ColdBias coldBias=ColdBias::Native; CathodeBypass coldBypass=CathodeBypass::Native; RectoVoice rectoVoice=RectoVoice::EarlyRed; EVHVoice evhVoice=EVHVoice::Blue;};
 struct Triode {
  double cap=0, blocking=0;
  double process(double input,double dt,double supply,double cathodeR){
@@ -65,11 +65,14 @@ struct Engine {
  auto chosen=controls.autoTube?(m==PowerModel::EVH&&controls.evhVoice==EVHVoice::BlueEL34?Tube::EL34:nativeTube(m)):controls.tube;auto t=data(chosen);auto ps=inverterSpec(m);bool cathodeBias=m==PowerModel::AC30;double target=q.B*(controls.spongy?.85:1.)-(controls.tubeRect?20:0);if(!ready||active!=chosen){bias=biasFor(t,target,q.screen*target/q.B);cathodeV=cathodeBias?-bias:0;grid1.charge=cathodeBias?0:-bias;grid2.charge=grid1.charge;active=chosen;ready=true;}
  // 0 dBu = .775 Vrms; -14 dBFS sine = .1995 peak.
  double v=x*5.493063;
- v=preamp.process(v,supply*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence)*((controls.preamp==PreampModel::Jose&&controls.joseArchitecture!=JoseArchitecture::Stock&&!controls.joseSAT)?1.:controls.master);
+ if(!controls.powerOnly){
+ v=preamp.process(v,supply*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence);
+ if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
+ } v*=controls.master*controls.master;
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
  double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC);
- double d1,d2;if(controls.inverterOnly){pi.process(clamp(v,-30.,30.),0.,supply*.72,dt,d1,d2,ps,controls.eco);return (d1-d2)/100.;}pi.loaded(clamp(v,-30.,30.),feedback,supply*.72,dt,cathodeBias?0:bias,cathodeV,grid1.charge,grid2.charge,d1,d2,ps,false);
+ double d1,d2;if(controls.inverterOnly){pi.process(clamp(v,-30.,30.),0.,supply*.72,dt,d1,d2,ps,controls.eco);return (d1-d2)/100.;}pi.process(clamp(v,-30.,30.),feedback,supply*.72,dt,d1,d2,ps,controls.eco);
  if(m==PowerModel::AC30){double diff=d1-d2;double r=1000.+250000.*(1-controls.presence);double sourceR=100000.;double a=dt/4.7e-9;double i=(diff-cutState)/(r+sourceR+a);cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
  if(m==PowerModel::RectoModern&&!isRecto(controls.preamp)){double diff=d1-d2;double high=diff-lp(diff,modernState,2200,dt);double atten=.65*(1-controls.presence)*high;d1-=atten*.5;d2+=atten*.5;}
  double g1=grid1.process(d1,cathodeBias?0:bias,dt,ps,cathodeV)-cathodeV,g2=grid2.process(d2,cathodeBias?0:bias,dt,ps,cathodeV)-cathodeV;
@@ -96,11 +99,12 @@ struct Engine {
  double source=clamp(emf*sat*coeff.invRatio,-100.,100.);
  double history=loadHistory;
  double nextI=(source+coeff.coilG*coilI-history*coeff.invG)*coeff.invDen;
- capV=(nextI+history)*coeff.invG;indI+=coeff.indStep*capV;coilI=nextI;fb=source-coeff.rs*coilI;return fb/40.;
+ capV=(nextI+history)*coeff.invG;indI+=coeff.indStep*capV;coilI=nextI;fb=source-coeff.rs*coilI;return fb/std::sqrt(2.*q.load*100.);
  }
  double processPreampOnly(double x){double v=x*(.775*std::sqrt(2.)/std::pow(10.,-14./20.));
- v=preamp.process(v,powerCircuit(selectedPower()).B*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence)*((controls.preamp==PreampModel::Jose&&controls.joseArchitecture!=JoseArchitecture::Stock&&!controls.joseSAT)?1.:controls.master);
- return std::clamp(v/30.,-1.,1.);}
+ v=preamp.process(v,powerCircuit(selectedPower()).B*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence);
+ if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
+ return v/30.;}
  double process(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j){double y=step(prev+(x-prev)*j/oversampling);if(!std::isfinite(y)){reset();return 0;}out+=y;}prev=x;double y=out/oversampling;return std::clamp(y-lp(y,outputDC,8.,1./fs),-1.,1.);}
 };
 }
