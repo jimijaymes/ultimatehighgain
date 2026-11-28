@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1 — Standard solver redundancy removal (unverified)
+- Reuse final screen-current evaluation and converged branch results at identical primary voltage; reuse reactive history.
+- Economy iteration budgets and branch evaluation path retained. No circuit or tolerance changes.
+- Build, null comparison and CPU benchmark pending.
+
 ## 0.3.0 — Rectifier and economy solver development (unverified)
 - RP-1F-inspired stage values and cold-stage pole, early Orange Modern presence routing: 91630deb.
 - Rectifier feedback seed and economy power/PI iteration budgets: 836eb244, 087885f7.
