@@ -174,3 +174,7 @@ Remove artificial Max digital output clamp; retain DC blocking. Light comparison
 
 ## 0.3.45 — Bias and gain audit instrumentation
 Expose accepted plate and screen currents for standalone measurements. Add physical input-voltage sweep, idle bias and output gain/THDN diagnostics across all four modes, with feedback on/off. No bias or gain adjustment pending results. Economy current probes not applicable. Build and results pending.
+
+
+### Diagnostic-only CI update
+Run bias_audit and four-mode light_compare in separate Linux Release jobs on main pushes; upload CSV. CPU timing is single-pass and cross-run comparisons are provisional. No DSP change.

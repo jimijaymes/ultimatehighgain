@@ -1,0 +1,25 @@
+name: Bias and CPU audit
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [bias_audit, light_compare]
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --target ${{ matrix.target }} --parallel 2
+      - run: |
+          set -o pipefail
+          stdbuf -oL ./build/${{ matrix.target }} | tee ${{ matrix.target }}.csv
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ matrix.target }}.csv
