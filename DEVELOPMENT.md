@@ -13,3 +13,7 @@ Read this first on resuming work; verify relevant source before edits. Update th
 - Road King channel presence distinction documented by https://mesa-boogie.imgix.net/media/User%20Manuals/Road%20King.pdf; exact pot and feedback wiring remains to verify. Multi-Watt full schematic not verified; manual https://mesa-boogie.imgix.net/media/User%20Manuals/3chRecto_multiWatt.pdf.
 - Economy solver iteration budgets reduced (836eb244, 087885f7); no benchmark yet. Standard optimization still pending.
 - Outstanding: exact bias, supply, transformer and feedback topology, per-stage supply nodes, complete switching and raw/clean if scoped later; tests and host validation. Existing cold-stage plate pole condition also affects other 39k/100k stages; review isolation before release.
+
+## 0.3.1 development
+- Standard solver reuses final screen current and converged branch results (2186c534 and subsequent screen reuse commit). No altered solver tolerances, iterations or circuit values. Economy remains the 0.3.0 reference. Shared reactive history expression reused without changing arithmetic.
+- Pending: build, sample-by-sample comparison against 0.3.0 and CPU benchmark. Do not claim measured speedup or bit identity before testing.
