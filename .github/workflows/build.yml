@@ -6,7 +6,8 @@ jobs:
   build:
     runs-on: windows-2022
     permissions:
-      contents: write
+      contents: read
+      issues: write
       actions: read
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +36,7 @@ jobs:
             $bad = @($rows | Where-Object { $_.ok -eq '0' })
             $report = @{commit=$env:GITHUB_SHA;run_id=$env:GITHUB_RUN_ID;count=$rows.Count;failed=$bad.Count;failures=@($bad | Select-Object -First 50);rows=$rows} | ConvertTo-Json -Depth 5 -Compress
             $report | Set-Content -Encoding utf8 diagnostic-report.json
-            gh api --method POST "repos/$env:GITHUB_REPOSITORY/commits/$env:GITHUB_SHA/comments" -f "body=Power diagnostics run $env:GITHUB_RUN_ID : $($rows.Count) rows, $($bad.Count) failures. See workflow logs and artifact."
+            gh api --method POST "repos/$env:GITHUB_REPOSITORY/issues/1/comments" -f "body=Power diagnostics commit $env:GITHUB_SHA run $env:GITHUB_RUN_ID : $($rows.Count) rows, $($bad.Count) failures. See workflow logs and artifact."
           }
       - name: Build VST3
         run: cmake --build build --config Release --target UltimateHighGain_VST3 --parallel 4
