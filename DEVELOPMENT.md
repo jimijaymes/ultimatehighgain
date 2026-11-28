@@ -72,3 +72,6 @@ Input trim and Output use -24 to +24 dB, default 0 dB, double-click reset. Input
 
 ## 0.3.17 — Rectifier presence routing and Pittbull switches
 Modern presence tone-stack branch enabled for early Orange Modern as provisional 25k range; power-only Modern uses existing PI-side HF contour instead of skipping presence. Economy avoids duplicate Modern presence shelf. Vintage feedback circuit unchanged. Pittbull CL-inspired Hi Gain (3/4 stages), Boost (interstage attenuation), Edge (peaker), Shift (tone-stack caps) added; values provisional, not traced from schematic. Hi Gain defaults on to preserve previous stage count. No KT88, depth or graphic EQ changes. Compile/audio/UI unverified.
+
+## 0.3.18 — Economy closed-loop feedback
+Restore native presence/negative feedback network in Economy using previous internal sample's physical speaker terminal voltage. Use provisional open-loop source impedance 1.1 times nominal load, removing duplicated closed-loop damping and generic presence shelf. Native no-feedback models and explicit No Feedback remain open-loop; PI-only remains isolated. Standard/Max unchanged. Loop gain and stability require measurement; build pending.
