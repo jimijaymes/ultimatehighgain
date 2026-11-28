@@ -53,3 +53,6 @@ Reuse final screen emission and plate exponential in Standard/Economy; hoist per
 
 ## 0.3.11 — Transformer companion circuit
 Implicit magnetizing branch included in primary residual and state update, avoiding explicit stiff feedback through reflected load. Speaker terminal voltage excludes transformer leakage voltage; reactive load preserved. No master taper, tube fit or precision changes. Unverified build/audio; low-master spitting/root cause not yet confirmed.
+
+## 0.3.12 — Diagnostic Economy power amp
+Economy full/power-only uses a linear voltage source with model-dependent damping, low-frequency rolloff, presence and passive reactive speaker load. Bypasses nonlinear PI/output tubes, sag and transformer solver; PI-only and direct bench retain existing solver. Standard/Max unchanged. Cabinet switch now applies in every signal mode. Reset on CPU transitions. Frequency response and gain provisional, build unverified.
