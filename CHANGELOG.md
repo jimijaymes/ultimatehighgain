@@ -109,3 +109,7 @@ Compare resolved and family Rectifier models with identical explicit voice and c
 
 ## 0.3.29 — Experimental Marshall stability test 1
 Standard/Max Marshall power model feeds preamp from a 5 Hz first-order decoupled supply state rather than instantaneous output-stage B+. This is a provisional RC-equivalent isolation experiment, not a measured circuit fit; slow sag retained, no valve or feedback values changed. Economy uses the same routing but its supply is static. Add full/power-only, feedback on/off and Economy/Standard isolation measurements to stability test; original pass criteria unchanged. Build and efficacy unverified. AC30 unresolved.
+
+
+## 0.3.30 — Independent modular preamp supply (experimental)
+Replace 0.3.29 Marshall-only filtered B+ with independent nominal preamp-family rail in Standard/Economy/Max, including preamp-only. Native family nominal B+ times existing 0.65/0.90 factors; provisional anchors, not measured per-stage rails. Power model, rectifier and spongy controls no longer alter preamp voltage; power-stage supply and PI remain unchanged. Add exact preamp-only invariance regression for all eleven preamp enum values. No shared sag in preamp; future linked supply network requires validation. Build and stability unverified.

@@ -50,9 +50,21 @@ struct Engine {
  PowerModel selectedPower() const {if(!controls.linkPower)return controls.power; switch(controls.preamp){case PreampModel::Peavey5150:return PowerModel::Peavey;case PreampModel::DualRectifier:return rectoModern(controls.rectoVoice)?PowerModel::RectoModern:PowerModel::RectoVintage;case PreampModel::VHT:return PowerModel::VHT;case PreampModel::EVH5150III:return PowerModel::EVH;default:return PowerModel::Marshall;}}
 
  void prepare(double rate){fs=rate;dt=1/(oversampling*fs);reset();}
- void reset(){preampRail=0.;sagCurrentSum=sagScreenSum=0;sagCount=0;preamp={};pi={};grid1={};grid2={};magI=0;presenceNet={};supply=circuit.B;screen=circuit.screen;fb=fbLow=flux=leak=capV=indI=coilI=bassZ=trebleZ=prev=gridBlock=peakPlate=0;active=controls.tube;outputDC=cathodeV=cutState=modernState=0;ready=false;}
+ void reset(){sagCurrentSum=sagScreenSum=0;sagCount=0;preamp={};pi={};grid1={};grid2={};magI=0;presenceNet={};supply=circuit.B;screen=circuit.screen;fb=fbLow=flux=leak=capV=indI=coilI=bassZ=trebleZ=prev=gridBlock=peakPlate=0;active=controls.tube;outputDC=cathodeV=cutState=modernState=0;ready=false;}
  double biasFor(TubeData t,double v,double s){double lo=-200,hi=0;double target=std::min(t.idle,.65*t.rating/std::max(1.,v));for(int i=0;i<32;++i){double m=(lo+hi)*.5;if(plate(t,v,m,s)>target)hi=m;else lo=m;}return (lo+hi)*.5;}
- double preampRail=0.;
+ double preampSupply() const {
+ // Independent nominal preamp rail; preserve native family voltage anchors.
+ PowerModel native=PowerModel::Marshall;
+ switch(controls.preamp){
+ case PreampModel::Peavey5150:native=PowerModel::Peavey;break;
+ case PreampModel::RectoOrange:case PreampModel::RectoRed:case PreampModel::RectoMulti:case PreampModel::DualRectifier:native=PowerModel::RectoVintage;break;
+ case PreampModel::VHT:native=PowerModel::VHT;break;
+ case PreampModel::EVHBlue:case PreampModel::EVHRed:case PreampModel::EVH5150III:native=PowerModel::EVH;break;
+ default:break;
+ }
+ return powerCircuit(native).B*(isRecto(controls.preamp)?.90:.65);
+ }
+
  double step(double x){auto m=selectedPower();if(m!=activePower){circuit=powerCircuit(m);activePower=m;reset();}auto &q=circuit;
  if(coeff.dt!=dt||coeff.model!=m||coeff.tubeRect!=controls.tubeRect){
  coeff.dt=dt;coeff.model=m;coeff.tubeRect=controls.tubeRect;
@@ -69,10 +81,7 @@ struct Engine {
  // 0 dBu = .775 Vrms; -14 dBFS sine = .1995 peak.
  double v=x*5.493063;
  if(!controls.powerOnly){
- // Experimental Marshall supply decoupling: retain slow sag, reject direct audio-rate rail coupling.
- if(preampRail<=0.)preampRail=supply;
- if(m==PowerModel::Marshall)lp(supply,preampRail,5.,dt);
- v=preamp.process(v,(m==PowerModel::Marshall?preampRail:supply)*(isRecto(controls.preamp)?.90:.65),dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence,controls.pittHi,controls.pittBoost,controls.pittEdge,controls.pittShift);
+ v=preamp.process(v,preampSupply(),dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence,controls.pittHi,controls.pittBoost,controls.pittEdge,controls.pittShift);
  if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
  } if(!controls.benchDirect)v*=(controls.preamp==PreampModel::Marshall||(controls.preamp==PreampModel::Jose&&controls.joseArchitecture==JoseArchitecture::Stock))?audioPot(controls.master):controls.master*controls.master;
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
@@ -124,7 +133,7 @@ struct Engine {
  }
 
  double preampOnlyStep(double x){double v=x*(.775*std::sqrt(2.)/std::pow(10.,-14./20.));
- v=preamp.process(v,(powerCircuit(selectedPower()).B*(controls.spongy?.85:1.)-(controls.tubeRect?20.:0.))*(isRecto(controls.preamp)?.90:.65),dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence,controls.pittHi,controls.pittBoost,controls.pittEdge,controls.pittShift);
+ v=preamp.process(v,preampSupply(),dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence,controls.pittHi,controls.pittBoost,controls.pittEdge,controls.pittShift);
  if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
  return 0.251188643150958*v/30.;}
  double processPreampOnly(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j)out+=preampOnlyStep(prev+(x-prev)*j/oversampling);prev=x;return out/oversampling;}
