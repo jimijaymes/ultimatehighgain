@@ -125,3 +125,7 @@ Max full amp linked mode filters upstream power-stage droop through provisional 
 
 ## 0.3.33 — Standard optimisation experiment 1
 Cache native preamp rail by model and supply switches. Try bracketed Illinois interpolation for primary load line, accepting only original 1e-5 residual; otherwise replay original 24-step bisection with unchanged bracket. AC30 excluded pending low-level investigation. Max unchanged. No signal-dependent precision or iteration cap reduction. CPU and waveform equivalence pending diagnostics; further screen, PI and preamp solver changes deferred until this isolated experiment is measured.
+
+
+## 0.3.34 — Diagnostic workflow separation
+Build and upload VST3 before long diagnostics. Preserve all raw rows; classify only existing AC30 detailed-mode low-level THD+N failures separately from active failures. Nonfinite or missing fundamental still fails the executable. No additional DSP changes pending controlled timing comparison.
