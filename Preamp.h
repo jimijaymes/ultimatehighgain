@@ -63,7 +63,7 @@ inline PreampSpec evhSpec(EVHVoice voice,ColdBias bias,CathodeBypass bypass){
 struct PreampStage {
  double cath=0, coupling=0, peak=0, lastCurrent=0; bool init=false;
  std::array<double,7> coeffKey{};bool coeffReady=false;double gc=0,gp=0,gr=0,gl=0,link=0,den=0,effective=0;
- double process(double in,double supply,double dt,const StageSpec& s,double pot=1.,double bright=0.,bool usePot=false,bool eco=false){
+ double process(double in,double supply,double dt,const StageSpec& s,double pot=1.,double bright=0.,bool usePot=false,bool eco=false,double volume=1.,bool postEQ=false){
  // Implicit coupling capacitor/grid leak and piecewise grid conduction.
  // Backward-Euler nodal solve: coupling cap, series peaker, pot and grid load.
  const std::array<double,7> key{dt,s.cc,s.rg,s.atten,s.peakC+bright,pot,usePot?1.:0.};
@@ -161,8 +161,10 @@ struct Preamp {
  double u=std::max(0.,1.125+v+2+(supply-250)/100);
  follower=std::min(supply,100000.*K*triodeLoad.get(u,K*101000.));
  }else{double lo=0,hi=supply;for(int j=0;j<22;++j){double k=(lo+hi)*.5; if(triodeCurrent(supply-k,v-k)>k/100000.)lo=k;else hi=k;} follower=(lo+hi)*.5;}}if(followerDC==0)followerDC=follower;followerDC+=dt/(.02+dt)*(follower-followerDC);v=(follower-followerDC); if(model==PreampModel::Jose && arch==JoseArchitecture::Snorkler)v=(follower-followerDC);
- if(model==PreampModel::Jose && arch!=JoseArchitecture::Stock)v=jose.process(v,dt,era);
- return tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.);
+ const bool clipping=model==PreampModel::Jose && arch!=JoseArchitecture::Stock;
+ if(clipping&&!postEQ)v=jose.process(v,dt,era,volume);
+ v=tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.);
+ if(clipping&&postEQ)v=jose.process(v,dt,era,volume);return v;
  }
 };
 }
