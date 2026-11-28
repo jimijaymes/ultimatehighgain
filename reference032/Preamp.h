@@ -157,7 +157,9 @@ struct Preamp {
  for(int i=0;i<p.count;++i){
  bool first=i==p.gainAfter+1;
  bool second=model==PreampModel::Jose && arch!=JoseArchitecture::Stock && arch!=JoseArchitecture::Molecular && i==2;
- double pos=first?std::clamp(gain,0.,1.):second?std::clamp(gain2,0.,1.):1.;
+ // Approximate audio taper: 10% resistance at half rotation.
+ auto audioTaper=[](double x){x=std::clamp(x,0.,1.);return x<=.5?.2*x:.1+1.8*(x-.5);};
+ double pos=first?audioTaper(gain):second?audioTaper(gain2):1.;
  // Ascending capacitance order; additional values are generic modification options.
  const double caps[]={0.,100e-12,220e-12,470e-12,1e-9,2.2e-9,4.7e-9,5e-9};
  const double native=(model==PreampModel::Marshall||arch==JoseArchitecture::Stock)?470e-12:0.; // provisional until individual layouts are traced

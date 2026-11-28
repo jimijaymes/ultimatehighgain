@@ -75,3 +75,6 @@ Modern presence tone-stack branch enabled for early Orange Modern as provisional
 
 ## 0.3.18 — Economy closed-loop feedback
 Restore native presence/negative feedback network in Economy using previous internal sample's physical speaker terminal voltage. Use provisional open-loop source impedance 1.1 times nominal load, removing duplicated closed-loop damping and generic presence shelf. Native no-feedback models and explicit No Feedback remain open-loop; PI-only remains isolated. Standard/Max unchanged. Loop gain and stability require measurement; build pending.
+
+## 0.3.19 — Low-level solver resolution and gain taper
+Detailed primary solve uses safeguarded secant/bisection with 1e-7 V convergence and expandable bracket; screen solve tightened to 1e-7 V residual, up to 32 iterations. No artificial gate or gain reduction. Preamp gain pots use provisional 10% audio taper at midpoint; maximum gain and interstage values unchanged. Exact hardware tapers and interstage measurements pending. Increased CPU cost possible; build and listening tests pending.
