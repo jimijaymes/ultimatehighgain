@@ -57,7 +57,7 @@ struct PhaseInverter {
  void process(double input,double feedback,double supply,double dt,double &o1,double &o2,PhaseInverterSpec spec={},bool eco=false){
  double lo=0,hi=supply;double i1=0,i2=0;
  double cath=initialized?std::clamp(tailEstimate,lo,hi):supply*.03;
- for(int k=0;k<20;++k){
+ for(int k=0;k<(eco?14:20);++k){
  double gridDC=cath*(1-spec.biasR/spec.tail);
  i1=current(input+gridDC,cath,supply,spec.plate1);
  i2=current(feedback+gridDC,cath,supply,spec.plate2);
