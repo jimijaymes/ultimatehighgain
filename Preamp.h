@@ -6,9 +6,10 @@ namespace uhg {
 enum class PreampModel { Marshall, Jose, Peavey5150, RectoOrange, RectoRed, RectoMulti, VHT, EVHBlue, EVHRed, DualRectifier, EVH5150III };
 enum class EVHVoice { Blue, Red, BlueEL34, BlueStealth, RedStealth };
 inline PreampModel resolveEVH(PreampModel m,EVHVoice v){return m==PreampModel::EVH5150III?((v==EVHVoice::Red||v==EVHVoice::RedStealth)?PreampModel::EVHRed:PreampModel::EVHBlue):m;}
-enum class RectoVoice { EarlyOrange, EarlyRed, MultiWattModern };
+enum class RectoVoice { EarlyOrange, EarlyRed, MultiWattModern, EarlyOrangeModern, EarlyRedVintage, MultiOrangeVintage, MultiOrangeModern, MultiRedVintage, RoadKing3Vintage, RoadKing3Modern, RoadKing4Vintage, RoadKing4Modern };
+inline bool rectoModern(RectoVoice v){return v==RectoVoice::EarlyRed||v==RectoVoice::MultiWattModern||v==RectoVoice::EarlyOrangeModern||v==RectoVoice::MultiOrangeModern||v==RectoVoice::RoadKing3Modern||v==RectoVoice::RoadKing4Modern;}
 inline bool isRecto(PreampModel m){return m==PreampModel::RectoOrange||m==PreampModel::RectoRed||m==PreampModel::RectoMulti||m==PreampModel::DualRectifier;}
-inline PreampModel resolveRecto(PreampModel m, RectoVoice v){if(m!=PreampModel::DualRectifier)return m;return v==RectoVoice::EarlyOrange?PreampModel::RectoOrange:v==RectoVoice::EarlyRed?PreampModel::RectoRed:PreampModel::RectoMulti;}
+inline PreampModel resolveRecto(PreampModel m, RectoVoice v){if(m!=PreampModel::DualRectifier)return m;return (v==RectoVoice::EarlyOrange||v==RectoVoice::EarlyOrangeModern)?PreampModel::RectoOrange:(v==RectoVoice::EarlyRed||v==RectoVoice::EarlyRedVintage)?PreampModel::RectoRed:PreampModel::RectoMulti;}
 enum class JoseArchitecture { Legacy, Classic, HBE, Snorkler, Stock, JosePostEQ, Molecular };
 enum class ColdBias { Native, Warm, Modified, Marshall, Cold, Soldano, Custom47k };
 enum class CathodeBypass { Native, Off, Small, Medium, Large };
@@ -148,6 +149,8 @@ struct Preamp {
  if(arch==JoseArchitecture::Legacy)arch=extraStage?JoseArchitecture::HBE:JoseArchitecture::Classic;
  if(!initialized||active!=model||evhActive!=evh||(biasActive!=bias||bypassActive!=bypass||(model==PreampModel::Jose && archActive!=arch))){*this=Preamp{};active=model;evhActive=evh;extraActive=extraStage;archActive=arch;biasActive=bias;bypassActive=bypass;initialized=true;}
  auto p=model==PreampModel::Jose?joseSpec(arch,bias,bypass):(evhFamily?evhSpec(evh,bias,bypass):modifiedSpec(model,bias,bypass)); double v=input;
+ // Provisional channel routing: distinct channel seeds, not verified schematic values.
+ if(model==PreampModel::RectoMulti){if(recto==RectoVoice::MultiOrangeVintage||recto==RectoVoice::MultiOrangeModern||recto==RectoVoice::RoadKing3Vintage||recto==RectoVoice::RoadKing3Modern)p.stages[3].atten=.08; if(recto==RectoVoice::RoadKing3Vintage||recto==RectoVoice::RoadKing3Modern||recto==RectoVoice::RoadKing4Vintage||recto==RectoVoice::RoadKing4Modern)p.stages[1].cc=22e-9;}
  for(int i=0;i<p.count;++i){
  bool first=i==p.gainAfter+1;
  bool second=model==PreampModel::Jose && arch!=JoseArchitecture::Stock && arch!=JoseArchitecture::Molecular && i==2;
