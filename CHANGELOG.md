@@ -38,3 +38,6 @@
 
 ## 0.3.6 — Experimental coupled phase inverter
 - Max receives new implicit grid loading via backward-Euler coupling and piecewise grid conduction relative to cathode. Standard/Economy use same equations with safeguarded Newton plate and bracketed secant cathode steps; identical new residual tolerances and iteration ceilings. Existing other solver settings unchanged. Preserves inverted plate-output convention; unloaded DC reference initialized once in loaded path. AC30 cut and standalone Modern shaping remain downstream, not jointly solved; grid load is reduced-order, not a verified hardware fit. Build, convergence, harmonic, null and CPU tests pending. Earlier reference remains available in Git history.
+
+## 0.3.7 — Gain staging diagnostics
+Power amp only and PI only bypass preamp; master is independent of preamp-only, uses provisional square taper in full/power paths. Channel volume exposed for non-Marshall models as provisional post-tone attenuation; Jose clipping volume retained. Removed hard clamp in preamp monitor. Temporarily bypass experimental loaded PI in all modes to isolate idle hum; original code retained. Cabinet bypassed in dry/preamp/PI checks. Output reference provisional 100 W into nominal load. Build and audio tests pending; hum not verified resolved.
