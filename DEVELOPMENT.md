@@ -57,3 +57,6 @@ Implicit magnetizing branch included in primary residual and state update, avoid
 
 ## 0.3.12 — Diagnostic Economy power amp
 Economy full/power-only uses a linear voltage source with model-dependent damping, low-frequency rolloff, presence and passive reactive speaker load. Bypasses nonlinear PI/output tubes, sag and transformer solver; PI-only and direct bench retain existing solver. Standard/Max unchanged. Cabinet switch now applies in every signal mode. Reset on CPU transitions. Frequency response and gain provisional, build unverified.
+
+## 0.3.13 — Economy retains nonlinear phase inverter
+Move Economy bypass after PI and model-specific PI voicing, before grid coupling. Retain PI clipping and master drive. Linear downstream reactive load uses provisional differential PI scaling (0.1); explicit global feedback disabled in Economy, represented by damping approximation instead. Standard/Max and cabinet routing unchanged. Build and gain calibration pending.
