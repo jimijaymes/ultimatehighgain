@@ -76,7 +76,7 @@ struct Engine {
 
  // Solve plate/screen current against the same instantaneous reflected voltage.
  struct Branch {double ip,is;};
- auto branch=[&](double vp,double vg){double low=0,high=screen,fl=-screen,fh=screenCurrent(t,vp-cathodeV,vg,std::max(0.,screen-cathodeV))*q.screenR;double vs=screen;for(int j=0;j<(controls.eco?3:6);++j){vs=low+(high-low)*(-fl)/(fh-fl);double f=vs+screenCurrent(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV))*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}return Branch{plate(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV)),screenCurrent(t,vp-cathodeV,vg,std::max(0.,vs-cathodeV))};};
+ auto branch=[&](double vp,double vg){const double plateV=vp-cathodeV;double low=0,high=screen,fl=-screen,fh=screenCurrent(t,plateV,vg,std::max(0.,screen-cathodeV))*q.screenR;double vs=screen,lastScreenCurrent=0;for(int j=0;j<(controls.eco?3:6);++j){vs=low+(high-low)*(-fl)/(fh-fl);lastScreenCurrent=screenCurrent(t,plateV,vg,std::max(0.,vs-cathodeV));double f=vs+lastScreenCurrent*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}return Branch{plate(t,plateV,vg,std::max(0.,vs-cathodeV)),controls.eco?screenCurrent(t,plateV,vg,std::max(0.,vs-cathodeV)):lastScreenCurrent};};
  // Implicit quasi-static primary load line; speaker dynamic state remains explicit.
  const double loadHistory=coeff.capG*capV-indI;
  const double reflectedHistory=(loadHistory*coeff.invG-coeff.coilG*coilI)/coeff.invRatio;
