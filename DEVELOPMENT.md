@@ -30,3 +30,6 @@ Read this first on resuming work; verify relevant source before edits. Update th
 - Max is a living maximum-fidelity reference, initially based on 0.3.2 Standard. Apply circuit accuracy improvements and higher-cost fidelity features to Max; do not apply computational simplifications, coefficient-hoisting optimisations, reduced update rates or solver precision reductions to Max.
 - Standard and Economy receive shared fidelity-preserving optimisations; retain existing Economy accuracy settings until user testing. For expensive fidelity improvements, implement Max first and evaluate equivalent efficient implementations for Standard/Economy; document any fidelity differences explicitly.
 - Keep reference headers independent and record reference revisions so comparisons remain reproducible. No DSP changes in this policy update.
+
+## 0.3.4 — Power amp invariant reuse
+- Standard/Economy cache reflected impedance, nominal screen drop, cathode integration denominator and PI specification. Reuse screen collection factors within each branch solve, PI square roots and grid coupling RHS. Dynamic states and solver limits unchanged; reference032 untouched. Build/null/CPU verification pending.
