@@ -82,10 +82,11 @@ struct Engine {
  const double reflectedHistory=(loadHistory*coeff.invG-coeff.coilG*coilI)/coeff.invRatio;
  const double reflectedZ=1/(coeff.invDen*coeff.invRatio*coeff.invRatio);
  double lo=-2*supply,hi=2*supply;
- auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);return ((a.ip-b.ip)*q.pairs*.5-magI)*reflectedZ+reflectedHistory-v;};
+ Branch cachedA{},cachedB{};double cachedV=0;bool cached=false;
+ auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);if(!controls.eco){cachedA=a;cachedB=b;cachedV=v;cached=true;}return ((a.ip-b.ip)*q.pairs*.5-magI)*reflectedZ+reflectedHistory-v;};
  double primaryV=0;
  for(int k=0;k<(controls.eco?12:16);++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.002){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
- primaryV=(lo+hi)*.5;auto a1=branch(supply-primaryV*.5,g1),a2=branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
+ primaryV=(lo+hi)*.5;const bool reuse=!controls.eco&&cached&&cachedV==primaryV;auto a1=reuse?cachedA:branch(supply-primaryV*.5,g1),a2=reuse?cachedB:branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
  double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double rk=47.;double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/(1+dt/(rk*ck)),0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
  double recharge=std::max(0.,(target-supply)*coeff.invSupplyR);supply=clamp(supply+coeff.supplyStep*(recharge-current),target*.45,target);
@@ -93,7 +94,7 @@ struct Engine {
  double emf=primaryV;magI+=coeff.magStep*(emf-magI*100);flux+=dt*(emf-flux*35);
  double normalizedFlux=flux*coeff.invFlux;double sat=1/std::sqrt(1+normalizedFlux*normalizedFlux);
  double source=clamp(emf*sat*coeff.invRatio,-100.,100.);
- double history=coeff.capG*capV-indI;
+ double history=loadHistory;
  double nextI=(source+coeff.coilG*coilI-history*coeff.invG)*coeff.invDen;
  capV=(nextI+history)*coeff.invG;indI+=coeff.indStep*capV;coilI=nextI;fb=source-coeff.rs*coilI;return fb/40.;
  }
