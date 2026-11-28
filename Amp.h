@@ -87,7 +87,7 @@ struct Engine {
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
  double feedback=(controls.eco&&!controls.benchDirect||controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,coeff.presenceR,q.presenceC);
- double d1,d2;if(controls.inverterOnly){pi.process(clamp(v,-30.,30.),0.,supply*.72,dt,d1,d2,ps,controls.eco);return (d1-d2)/100.;}pi.process(clamp(v,-30.,30.),feedback,supply*.72,dt,d1,d2,ps,controls.eco);
+ double d1,d2;if(controls.inverterOnly){pi.process(v,0.,supply*.72,dt,d1,d2,ps,controls.eco);return (d1-d2)/100.*0.251188643150958;}pi.process(v,feedback,supply*.72,dt,d1,d2,ps,controls.eco);
  if(m==PowerModel::AC30){double diff=d1-d2;double sourceR=100000.;double a=coeff.cutA;double i=(diff-cutState)/coeff.cutDen;cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
  if(m==PowerModel::RectoModern&&!isRecto(controls.preamp)){double diff=d1-d2;modernState+=coeff.modernAlpha*(diff-modernState);double high=diff-modernState;double atten=coeff.modernGain*high;d1-=atten*.5;d2+=atten*.5;}
  if(controls.eco&&!controls.benchDirect)return economyPower((d1-d2)*.1,m,q);
@@ -118,11 +118,11 @@ struct Engine {
  double emf=primaryV;magI=(magI+coeff.magStep*emf)/magDen;flux+=dt*(emf-flux*35);
  // Use the same transformer voltage in the load solve and state update.
  double source=emf*coeff.invRatio;
- if(controls.benchResistive){fb=source;return fb/std::sqrt(2.*q.load*100.);}
+ if(controls.benchResistive){fb=source;return 0.251188643150958*fb/std::sqrt(2.*q.load*100.);}
  double history=loadHistory;
  const double oldCoilI=coilI;
  double nextI=(source+coeff.coilG*coilI-history*coeff.invG)*coeff.invDen;
- capV=(nextI+history)*coeff.invG;indI+=coeff.indStep*capV;coilI=nextI;fb=q.load*.8*coilI+capV+(.0005/dt)*(coilI-oldCoilI);return fb/std::sqrt(2.*q.load*100.);
+ capV=(nextI+history)*coeff.invG;indI+=coeff.indStep*capV;coilI=nextI;fb=q.load*.8*coilI+capV+(.0005/dt)*(coilI-oldCoilI);return 0.251188643150958*fb/std::sqrt(2.*q.load*100.);
  }
  double economyLow=0,economyHigh=0,economyCap=0,economyInd=0,economyCoil=0;
  double economyPower(double v,PowerModel m,const Circuit& q){
@@ -140,12 +140,12 @@ struct Engine {
  const double series=.0005/dt;
  const double current=(drive+series*economyCoil-z*hist)/(rs+q.load*.8+series+z);
  economyCap=z*(current+hist);economyInd+=gl*economyCap;economyCoil=current;
- return (drive-rs*current)/std::sqrt(2.*q.load*100.);
+ return 0.251188643150958*(drive-rs*current)/std::sqrt(2.*q.load*100.);
  }
  double preampOnlyStep(double x){double v=x*(.775*std::sqrt(2.)/std::pow(10.,-14./20.));
  v=preamp.process(v,(powerCircuit(selectedPower()).B*(controls.spongy?.85:1.)-(controls.tubeRect?20.:0.))*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence);
  if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
- return v/30.;}
+ return 0.251188643150958*v/30.;}
  double processPreampOnly(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j)out+=preampOnlyStep(prev+(x-prev)*j/oversampling);prev=x;return out/oversampling;}
  double process(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j){double y=step(prev+(x-prev)*j/oversampling);if(!std::isfinite(y)){reset();return 0;}out+=y;}prev=x;double y=out/oversampling;outputDC+=coeff.outputAlpha*(y-outputDC);return y-outputDC;}
 };

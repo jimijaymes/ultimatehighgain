@@ -63,3 +63,6 @@ Move Economy bypass after PI and model-specific PI voicing, before grid coupling
 
 ## 0.3.14 — Gain staging diagnostics
 Remove artificial hard digital output clamp in both engines (host floating-point output retains headroom; output trim remains). Preamp-only uses same oversampling interpolation and nominal rectifier/spongy supply settings as full amp. No interstage attenuation or clipping threshold changes. Full amp preamp voltage may legitimately exceed direct input; actual PI sensitivity and output references remain uncalibrated. Standard/Max low-level fault unresolved. Build pending.
+
+## 0.3.15 — Physical voltage headroom
+Remove artificial +/-30 V PI input clamp in both engines; retain physical valve/load equations and input calibration. Apply -12 dB monitoring scaling only at each modeled signal output, including Economy; 100 W sine reference now -12 dBFS peak. Raw dry mode unchanged. Diagnostic reference voltages remain provisional. No change to feedback voltage or internal gain. Existing sessions may require output trim adjustment. Build/audio and low-level stability unverified.
