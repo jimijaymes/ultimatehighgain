@@ -44,3 +44,6 @@ Power amp only and PI only bypass preamp; master is independent of preamp-only, 
 
 ## 0.3.8 — Calibration bench
 Added standalone calibration executable, default Rectifier sweep and --all for all power models. Direct calibrated PI input bypasses master/preamp; internal resistive 8-ohm test option, reactive remains default. CSV reports raw secondary voltage, DC, RMS, resistive watts, harmonics 2–10 THD, supply/bias and runtime. No fitted parameters changed. Resistive branch retains approximate transformer saturation; output voltage and reflected impedance conventions require validation. No build or measurement verified yet. Run cmake --build build --config Release --target calibration, then calibration > calibration.csv (or --all). Further tests for current, bursts, IMD and null comparison pending.
+
+## 0.3.9 — Output stage stability investigation
+User reports PI-only works, full/power-only spit or cut out with high idle meter. Removed inconsistent post-solve transformer saturation from both engines; reactive load retained. Implicit reservoir update and screen solver denominator guard. These are diagnostic corrections, not verified fixes. Restore physically coupled transformer saturation after calibration. Build and bench results pending.
