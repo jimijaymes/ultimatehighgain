@@ -53,12 +53,13 @@ struct PhaseInverter {
  }
  return i;
  }
- double tailEstimate=0;
+ double tailEstimate=0, cachedDt=0, alpha=0, cachedBias=0,cachedTail=0,gridFactor=0;
  void process(double input,double feedback,double supply,double dt,double &o1,double &o2,PhaseInverterSpec spec={},bool eco=false){
+ if(cachedDt!=dt){cachedDt=dt;alpha=1-std::exp(-6.283185307*2*dt);}if(cachedBias!=spec.biasR||cachedTail!=spec.tail){cachedBias=spec.biasR;cachedTail=spec.tail;gridFactor=1-spec.biasR/spec.tail;}
  double lo=0,hi=supply;double i1=0,i2=0;
  double cath=initialized?std::clamp(tailEstimate,lo,hi):supply*.03;
  for(int k=0;k<(eco?14:20);++k){
- double gridDC=cath*(1-spec.biasR/spec.tail);
+ double gridDC=cath*gridFactor;
  i1=current(input+gridDC,cath,supply,spec.plate1);
  i2=current(feedback+gridDC,cath,supply,spec.plate2);
  double f=(i1+i2)*spec.tail-cath;
@@ -67,8 +68,8 @@ struct PhaseInverter {
  cath=(lo+hi)*.5;
  }
  tailEstimate=cath;
- double p1=supply-i1*spec.plate1,p2=supply-i2*spec.plate2;if(!initialized){dc1=p1;dc2=p2;initialized=true;}double alpha=1-std::exp(-6.283185307*2*dt);dc1+=alpha*(p1-dc1);dc2+=alpha*(p2-dc2);o1=dc1-p1;o2=dc2-p2;
+ double p1=supply-i1*spec.plate1,p2=supply-i2*spec.plate2;if(!initialized){dc1=p1;dc2=p2;initialized=true;}dc1+=alpha*(p1-dc1);dc2+=alpha*(p2-dc2);o1=dc1-p1;o2=dc2-p2;
  }
 };
-struct GridCoupling {double charge=0;double process(double drive,double bias,double dt,PhaseInverterSpec spec={}){double c=spec.coupling,r=spec.gridLeak,rs=spec.gridStop;double gc=c/dt;double g=1/r+gc;const double rhs=bias/r+gc*(drive-charge);double v=rhs/g; if(v>0)v=rhs/(g+1/rs);charge=drive-v;return v;}};
+struct GridCoupling {double charge=0,keyDt=0,keyC=0,keyR=0,keyRs=0,gc=0,g=0,conductingG=0;double process(double drive,double bias,double dt,PhaseInverterSpec spec={}){double c=spec.coupling,r=spec.gridLeak,rs=spec.gridStop;if(dt!=keyDt||c!=keyC||r!=keyR||rs!=keyRs){keyDt=dt;keyC=c;keyR=r;keyRs=rs;gc=c/dt;g=1/r+gc;conductingG=g+1/rs;}const double rhs=bias/r+gc*(drive-charge);double v=rhs/g; if(v>0)v=rhs/conductingG;charge=drive-v;return v;}};
 }
