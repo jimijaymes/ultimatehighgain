@@ -32,7 +32,7 @@ case PowerModel::SLO: q.B=500;q.screen=480;q.primary=1900;q.feedbackR=39000;q.re
 default: break;}return q;}
 inline Tube nativeTube(PowerModel m){switch(m){case PowerModel::AC30:case PowerModel::MiniRecto:return Tube::EL84;case PowerModel::Peavey:case PowerModel::RectoVintage:case PowerModel::RectoModern:case PowerModel::VHT:case PowerModel::EVH:case PowerModel::SLO:return Tube::L6;default:return Tube::EL34;}}
 inline PhaseInverterSpec inverterSpec(PowerModel m){PhaseInverterSpec p;switch(m){case PowerModel::RectoVintage:case PowerModel::RectoModern:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::AC30:p.plate1=100000;p.plate2=100000;p.tail=48200;p.biasR=1200;p.coupling=150e-9;p.gridStop=1500;break;case PowerModel::MiniRecto:case PowerModel::Peavey:case PowerModel::EVH:p.coupling=47e-9;p.gridStop=1500;break;case PowerModel::VHT:case PowerModel::SLO:p.coupling=100e-9;p.gridStop=2200;break;default:break;}return p;}
-struct Controls {bool disableFeedback=false;bool inverterOnly=false;bool powerOnly=false;bool eco=false;bool autoTube=true;bool linkPower=true; PowerModel power=PowerModel::Marshall;double presence=.5, gain=.5, master=.25, bass=.5, mid=.5, treble=.5; bool spongy=false,tubeRect=false; Tube tube=Tube::EL34; PreampModel preamp=PreampModel::Marshall; JoseEra joseEra=JoseEra::Zener20; bool joseExtraStage=true; double joseGain2=.7; double volume=1.; bool josePostEQ=false; bool joseSAT=false; int brightMode=1; JoseArchitecture joseArchitecture=JoseArchitecture::Legacy; ColdBias joseBias=ColdBias::Native; CathodeBypass joseBypass=CathodeBypass::Native; ColdBias coldBias=ColdBias::Native; CathodeBypass coldBypass=CathodeBypass::Native; RectoVoice rectoVoice=RectoVoice::EarlyRed; EVHVoice evhVoice=EVHVoice::Blue;};
+struct Controls {bool disableFeedback=false;bool inverterOnly=false;bool powerOnly=false;bool benchResistive=false;bool benchDirect=false;bool eco=false;bool autoTube=true;bool linkPower=true; PowerModel power=PowerModel::Marshall;double presence=.5, gain=.5, master=.25, bass=.5, mid=.5, treble=.5; bool spongy=false,tubeRect=false; Tube tube=Tube::EL34; PreampModel preamp=PreampModel::Marshall; JoseEra joseEra=JoseEra::Zener20; bool joseExtraStage=true; double joseGain2=.7; double volume=1.; bool josePostEQ=false; bool joseSAT=false; int brightMode=1; JoseArchitecture joseArchitecture=JoseArchitecture::Legacy; ColdBias joseBias=ColdBias::Native; CathodeBypass joseBypass=CathodeBypass::Native; ColdBias coldBias=ColdBias::Native; CathodeBypass coldBypass=CathodeBypass::Native; RectoVoice rectoVoice=RectoVoice::EarlyRed; EVHVoice evhVoice=EVHVoice::Blue;};
 struct Triode {
  double cap=0, blocking=0;
  double process(double input,double dt,double supply,double cathodeR){
@@ -68,7 +68,7 @@ struct Engine {
  if(!controls.powerOnly){
  v=preamp.process(v,supply*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence);
  if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
- } v*=controls.master*controls.master;
+ } if(!controls.benchDirect)v*=controls.master*controls.master;
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
  double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC);
@@ -82,8 +82,8 @@ struct Engine {
  auto branch=[&](double vp,double vg){const double plateV=vp-cathodeV;double low=0,high=screen,fl=-screen,fh=screenCurrent(t,plateV,vg,std::max(0.,screen-cathodeV))*q.screenR;double vs=screen,lastScreenCurrent=0;for(int j=0;j<(controls.eco?3:6);++j){vs=low+(high-low)*(-fl)/(fh-fl);lastScreenCurrent=screenCurrent(t,plateV,vg,std::max(0.,vs-cathodeV));double f=vs+lastScreenCurrent*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}return Branch{plate(t,plateV,vg,std::max(0.,vs-cathodeV)),lastScreenCurrent};};
  // Implicit quasi-static primary load line; speaker dynamic state remains explicit.
  const double loadHistory=coeff.capG*capV-indI;
- const double reflectedHistory=(loadHistory*coeff.invG-coeff.coilG*coilI)/coeff.invRatio;
- const double reflectedZ=1/(coeff.invDen*coeff.invRatio*coeff.invRatio);
+ const double reflectedHistory=controls.benchResistive?0.:(loadHistory*coeff.invG-coeff.coilG*coilI)/coeff.invRatio;
+ const double reflectedZ=controls.benchResistive?q.primary:1/(coeff.invDen*coeff.invRatio*coeff.invRatio);
  double lo=-2*supply,hi=2*supply;
  Branch cachedA{},cachedB{};double cachedV=0;bool cached=false;
  auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);cachedA=a;cachedB=b;cachedV=v;cached=true;return ((a.ip-b.ip)*q.pairs*.5-magI)*reflectedZ+reflectedHistory-v;};
@@ -97,6 +97,7 @@ struct Engine {
  double emf=primaryV;magI+=coeff.magStep*(emf-magI*100);flux+=dt*(emf-flux*35);
  double normalizedFlux=flux*coeff.invFlux;double sat=1/std::sqrt(1+normalizedFlux*normalizedFlux);
  double source=clamp(emf*sat*coeff.invRatio,-100.,100.);
+ if(controls.benchResistive){fb=source;return fb/std::sqrt(2.*q.load*100.);}
  double history=loadHistory;
  double nextI=(source+coeff.coilG*coilI-history*coeff.invG)*coeff.invDen;
  capV=(nextI+history)*coeff.invG;indI+=coeff.indStep*capV;coilI=nextI;fb=source-coeff.rs*coilI;return fb/std::sqrt(2.*q.load*100.);
