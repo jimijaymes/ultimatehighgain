@@ -84,3 +84,6 @@ Early Rectifier gain network uses provisional lumped 2.2M series + 470k stopper 
 
 ## 0.3.21 — Restore previous detailed power solver
 Revert only the primary and screen solver changes from 0.3.19 after reported clicks/pops and loss of audio. Preserve preamp, gain taper, headroom and Economy changes. Original low-level distortion remains unresolved. Build and audio verification pending.
+
+## 0.3.22 — Diagnostic-only baseline
+Standalone power_diagnostics measures normal process() path, PI-only and detailed resistive bench across Recto Vintage/Modern, CPU modes, feedback, sample rates and signal levels. CSV reports RMS, peak, fundamental, THD, residual THD+N, supply, screen, bias and elapsed time. Nonfinite or missing output fails; distortion is recorded without speculative pass limits. No DSP changes.
