@@ -138,10 +138,7 @@ struct Engine {
  Branch cachedA{},cachedB{};double cachedV=0;bool cached=false;
  auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);cachedA=a;cachedB=b;cachedV=v;cached=true;return ((a.ip-b.ip)*q.pairs*.5-magI/magDen+reflectedHistory/loadZ)*reflectedZ-v;};
  double primaryV=0;
- // Try a bracketed interpolation at full original precision; otherwise replay original bisection.
- // AC30 retains original solver pending low-level diagnostic investigation.
- if(m!=PowerModel::AC30){double l=lo,h=hi,fl=residual(l),fh=residual(h);if(fl>0&&fh<0){for(int k=0;k<8;++k){double v=l+(h-l)*fl/(fl-fh);if(!(v>l&&v<h))break;double f=residual(v);if(std::abs(f)<.00001){lo=hi=v;break;}if(f>0){l=v;fl=f;fh*=.5;}else{h=v;fh=f;fl*=.5;}}}}
- if(lo!=hi)for(int k=0;k<24;++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.00001){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
+ for(int k=0;k<24;++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.00001){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
  primaryV=(lo+hi)*.5;const bool reuse=cached&&cachedV==primaryV;auto a1=reuse?cachedA:branch(supply-primaryV*.5,g1),a2=reuse?cachedB:branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
  double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/coeff.cathDen,0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;

@@ -134,3 +134,7 @@ Build and upload VST3 before long diagnostics. Preserve all raw rows; classify o
 
 ## 0.3.35 — Paired Standard CPU benchmark
 Freeze exact v0.3.32 headers in baseline032 (namespace renamed only). Compare current Standard against baseline on same runner, alternating order, median of three, 48/96 kHz, three input amplitudes, all ten power models, report waveform relative RMS and peak error. VST3 uploaded first. No DSP changes. Benchmark does not certify full DAW CPU or all circuit settings.
+
+
+## 0.3.36 — Restore Standard transformer bisection
+Paired benchmark run 46145796716 showed 25–37% slower affected models and low-level waveform differences (SLO relative RMS up to 86.77%). Restore exact v0.3.32 transformer root iteration, retain rail cache and all diagnostics. No Max, AC30, preamp voicing or tolerance changes. Verify paired benchmark before any further solver work.
