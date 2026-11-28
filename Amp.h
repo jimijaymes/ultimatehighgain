@@ -99,10 +99,12 @@ struct Engine {
  // Implicit quasi-static primary load line; speaker dynamic state remains explicit.
  const double loadHistory=coeff.capG*capV-indI;
  const double reflectedHistory=controls.benchResistive?0.:(loadHistory*coeff.invG-coeff.coilG*coilI)/coeff.invRatio;
- const double reflectedZ=controls.benchResistive?q.primary:coeff.reflectedZ;
+ const double loadZ=controls.benchResistive?q.primary:coeff.reflectedZ;
+ const double magDen=1+100*coeff.magStep;
+ const double reflectedZ=loadZ/(1+loadZ*coeff.magStep/magDen);
  double lo=-2*supply,hi=2*supply;
  Branch cachedA{},cachedB{};double cachedV=0;bool cached=false;
- auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);cachedA=a;cachedB=b;cachedV=v;cached=true;return ((a.ip-b.ip)*q.pairs*.5-magI)*reflectedZ+reflectedHistory-v;};
+ auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);cachedA=a;cachedB=b;cachedV=v;cached=true;return ((a.ip-b.ip)*q.pairs*.5-magI/magDen+reflectedHistory/loadZ)*reflectedZ-v;};
  double primaryV=0;
  for(int k=0;k<(controls.eco?12:16);++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.002){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
  primaryV=(lo+hi)*.5;const bool reuse=cached&&cachedV==primaryV;auto a1=reuse?cachedA:branch(supply-primaryV*.5,g1),a2=reuse?cachedB:branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
@@ -111,13 +113,14 @@ struct Engine {
  // Backward Euler reservoir update avoids stiff explicit supply oscillation.
  supply=clamp((supply+coeff.supplyStep*(target*coeff.invSupplyR-current))/(1+coeff.supplyStep*coeff.invSupplyR),target*.45,target);
  screen+=coeff.screenAlpha*(clamp(supply-coeff.screenDrop-screens*100,30.,supply)-screen);
- double emf=primaryV;magI+=coeff.magStep*(emf-magI*100);flux+=dt*(emf-flux*35);
+ double emf=primaryV;magI=(magI+coeff.magStep*emf)/magDen;flux+=dt*(emf-flux*35);
  // Use the same transformer voltage in the load solve and state update.
  double source=emf*coeff.invRatio;
  if(controls.benchResistive){fb=source;return fb/std::sqrt(2.*q.load*100.);}
  double history=loadHistory;
+ const double oldCoilI=coilI;
  double nextI=(source+coeff.coilG*coilI-history*coeff.invG)*coeff.invDen;
- capV=(nextI+history)*coeff.invG;indI+=coeff.indStep*capV;coilI=nextI;fb=source-coeff.rs*coilI;return fb/std::sqrt(2.*q.load*100.);
+ capV=(nextI+history)*coeff.invG;indI+=coeff.indStep*capV;coilI=nextI;fb=q.load*.8*coilI+capV+(.0005/dt)*(coilI-oldCoilI);return fb/std::sqrt(2.*q.load*100.);
  }
  double processPreampOnly(double x){double v=x*(.775*std::sqrt(2.)/std::pow(10.,-14./20.));
  v=preamp.process(v,powerCircuit(selectedPower()).B*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence);

@@ -50,3 +50,6 @@ User reports PI-only works, full/power-only spit or cut out with high idle meter
 
 ## 0.3.10 — Economy solver optimization
 Reuse final screen emission and plate exponential in Standard/Economy; hoist per-sample grid terms. Economy PI tail solver uses bracketed secant with midpoint fallback, unchanged iteration cap and residual tolerance. Cutoff current early return. Max untouched. No new reduced-rate states or precision cuts. Numerical equivalence, runtime and build not verified.
+
+## 0.3.11 — Transformer companion circuit
+Implicit magnetizing branch included in primary residual and state update, avoiding explicit stiff feedback through reflected load. Speaker terminal voltage excludes transformer leakage voltage; reactive load preserved. No master taper, tube fit or precision changes. Unverified build/audio; low-master spitting/root cause not yet confirmed.
