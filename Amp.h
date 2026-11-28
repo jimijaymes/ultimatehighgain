@@ -9,10 +9,10 @@ inline double clamp(double x,double a,double b){return std::clamp(x,a,b);}
 inline double lp(double x,double &z,double f,double dt){z+=(1-std::exp(-6.283185307*f*dt))*(x-z);return z;}
 // Reduced-order RC feedback divider, with series presence rheostat and capacitor.
 struct PresenceNetwork {
- double capacitor=0;
+ double capacitor=0; double keyDt=0,keyRf=0,keyRg=0,keyRp=0,keyC=0,rth=0,a=0,den=0;
  double process(double tap,double dt,double rf,double rg,double rp,double c){
-  const double rth=rf*rg/(rf+rg), vth=tap*rg/(rf+rg);
-  const double a=dt/c, i=(vth-capacitor)/(rth+rp+a);
+  if(dt!=keyDt||rf!=keyRf||rg!=keyRg||rp!=keyRp||c!=keyC){keyDt=dt;keyRf=rf;keyRg=rg;keyRp=rp;keyC=c;rth=rf*rg/(rf+rg);a=dt/c;den=rth+rp+a;}
+  const double vth=tap*rg/(rf+rg), i=(vth-capacitor)/den;
   capacitor+=a*i;
   return vth-rth*i;
  }
@@ -43,7 +43,7 @@ struct Triode {
  }
 };
 struct Engine {
- struct Prepared {double dt=0;PowerModel model=PowerModel::Marshall;bool tubeRect=false;double invRatio,magStep,invFlux,capG,invG,coilG,invDen,indStep,rs,supplyStep,invSupplyR,screenAlpha,feedbackScale,reflectedZ,screenDrop,cathDen;PhaseInverterSpec ps;}; Prepared coeff{};
+ struct Prepared {double dt=0;PowerModel model=PowerModel::Marshall;bool tubeRect=false,spongy=false,valid=false;double target=0;double invRatio,magStep,invFlux,capG,invG,coilG,invDen,indStep,rs,supplyStep,invSupplyR,screenAlpha,feedbackScale,reflectedZ,screenDrop,cathDen;PhaseInverterSpec ps;double cutA=0,cutDen=0,modernAlpha=0,outputAlpha=0;double presence=-1,modernGain=0,presenceR=0;Tube tube=Tube::EL34;bool tubeValid=false;TubeData tubeData{};double share=0,ref=0,u0=0,plateRef=0,plateSlopeDen=0;}; Prepared coeff{};
  Circuit circuit; Controls controls; int oversampling=1; double fs=48000,dt=1./48000; Preamp preamp; PhaseInverter pi; GridCoupling grid1,grid2; double magI=0; PresenceNetwork presenceNet; double supply=450, screen=440,bias=-40, fb=0,fbLow=0,flux=0,leak=0,capV=0,indI=0,coilI=0, bassZ=0,trebleZ=0, prev=0,gridBlock=0; double sagCurrentSum=0, sagScreenSum=0; int sagCount=0; double debugPreamp=0; double outputDC=0; double screenEstimate1=440,screenEstimate2=440; double peakPlate=0,cathodeV=0,cutState=0,modernState=0; Tube active=Tube::EL34; bool ready=false; PowerModel activePower=PowerModel::Marshall;
  PowerModel selectedPower() const {if(!controls.linkPower)return controls.power; switch(controls.preamp){case PreampModel::Peavey5150:return PowerModel::Peavey;case PreampModel::DualRectifier:return rectoModern(controls.rectoVoice)?PowerModel::RectoModern:PowerModel::RectoVintage;case PreampModel::VHT:return PowerModel::VHT;case PreampModel::EVH5150III:return PowerModel::EVH;default:return PowerModel::Marshall;}}
 
@@ -51,33 +51,46 @@ struct Engine {
  void reset(){sagCurrentSum=sagScreenSum=0;sagCount=0;preamp={};pi={};grid1={};grid2={};magI=0;presenceNet={};supply=circuit.B;screen=circuit.screen;fb=fbLow=flux=leak=capV=indI=coilI=bassZ=trebleZ=prev=gridBlock=peakPlate=0;active=controls.tube;outputDC=cathodeV=cutState=modernState=0;ready=false;}
  double biasFor(TubeData t,double v,double s){double lo=-200,hi=0;double target=std::min(t.idle,.65*t.rating/std::max(1.,v));for(int i=0;i<32;++i){double m=(lo+hi)*.5;if(plate(t,v,m,s)>target)hi=m;else lo=m;}return (lo+hi)*.5;}
  double step(double x){auto m=selectedPower();if(m!=activePower){circuit=powerCircuit(m);activePower=m;reset();}auto &q=circuit;
- if(coeff.dt!=dt||coeff.model!=m||coeff.tubeRect!=controls.tubeRect){
- coeff.dt=dt;coeff.model=m;coeff.tubeRect=controls.tubeRect;
- coeff.invRatio=std::sqrt(q.load/q.primary);coeff.magStep=dt/q.transformerL;coeff.invFlux=1/q.fluxLimit;
- constexpr double Lm=.018,omega=6.283185307*95.; // Fixed generic 4x12 reactive impedance
+ const bool modelChanged=!coeff.valid||coeff.model!=m;
+ const bool rateChanged=!coeff.valid||coeff.dt!=dt;
+ const bool rectChanged=!coeff.valid||coeff.tubeRect!=controls.tubeRect;
+ const bool supplyChanged=modelChanged||rectChanged||coeff.spongy!=controls.spongy;
+ if(modelChanged){
+ coeff.invRatio=std::sqrt(q.load/q.primary);coeff.invFlux=1/q.fluxLimit;coeff.rs=q.load*.12;
+ coeff.screenDrop=q.B-q.screen;coeff.ps=inverterSpec(m);coeff.feedbackScale=std::sqrt(q.feedbackTap/q.load);
+ }
+ if(modelChanged||rateChanged){
+ coeff.magStep=dt/q.transformerL;
+ constexpr double Lm=.018,omega=6.283185307*95.;
  coeff.capG=1/(omega*omega*Lm*dt);coeff.indStep=dt/Lm;
  coeff.invG=1/(1/(q.load*5.45)+coeff.indStep+coeff.capG);
- coeff.coilG=(.0005+q.leakage*q.load/q.primary)/dt;coeff.rs=q.load*.12;
+ coeff.coilG=(.0005+q.leakage*q.load/q.primary)/dt;
  coeff.invDen=1/(q.load*.8+coeff.rs+coeff.coilG+coeff.invG);
- coeff.supplyStep=dt/q.reservoir;coeff.invSupplyR=1/(q.supplyR+(controls.tubeRect?65:0));
- coeff.reflectedZ=1/(coeff.invDen*coeff.invRatio*coeff.invRatio);coeff.screenDrop=q.B-q.screen;coeff.cathDen=1+dt/(47.*250e-6);coeff.ps=inverterSpec(m);
- coeff.screenAlpha=-std::expm1(-6.283185307*35*dt);coeff.feedbackScale=std::sqrt(q.feedbackTap/q.load);
+ coeff.reflectedZ=1/(coeff.invDen*coeff.invRatio*coeff.invRatio);
+ coeff.supplyStep=dt/q.reservoir;
  }
- auto chosen=controls.autoTube?(m==PowerModel::EVH&&controls.evhVoice==EVHVoice::BlueEL34?Tube::EL34:nativeTube(m)):controls.tube;auto t=data(chosen);const auto& ps=coeff.ps;bool cathodeBias=m==PowerModel::AC30;double target=q.B*(controls.spongy?.85:1.)-(controls.tubeRect?20:0);if(!ready||active!=chosen){bias=biasFor(t,target,q.screen*target/q.B);cathodeV=cathodeBias?-bias:0;grid1.charge=cathodeBias?0:-bias;grid2.charge=grid1.charge;active=chosen;ready=true;}
+ if(rateChanged){coeff.cathDen=1+dt/(47.*250e-6);coeff.screenAlpha=-std::expm1(-6.283185307*35*dt);coeff.cutA=dt/4.7e-9;coeff.modernAlpha=1-std::exp(-6.283185307*2200*dt);coeff.outputAlpha=1-std::exp(-6.283185307*8.*(1./fs));}
+ if(modelChanged||rectChanged)coeff.invSupplyR=1/(q.supplyR+(controls.tubeRect?65:0));
+ if(supplyChanged)coeff.target=q.B*(controls.spongy?.85:1.)-(controls.tubeRect?20:0);
+ if(modelChanged||rateChanged||coeff.presence!=controls.presence){coeff.presence=controls.presence;coeff.presenceR=q.presenceR*(1-clamp(controls.presence,0.,1.));coeff.cutDen=1000.+250000.*(1-controls.presence)+100000.+coeff.cutA;coeff.modernGain=.65*(1-controls.presence);}
+ coeff.valid=true;coeff.dt=dt;coeff.model=m;coeff.tubeRect=controls.tubeRect;coeff.spongy=controls.spongy;
+ auto chosen=controls.autoTube?(m==PowerModel::EVH&&controls.evhVoice==EVHVoice::BlueEL34?Tube::EL34:nativeTube(m)):controls.tube;
+ if(!coeff.tubeValid||coeff.tube!=chosen){coeff.tubeValid=true;coeff.tube=chosen;coeff.tubeData=data(chosen);const auto& t=coeff.tubeData;coeff.share=t.is/t.ia;coeff.ref=1+2*valveExp.get(t.va/t.knee);coeff.u0=1.5*t.ia/t.gm;coeff.plateRef=1-valveExp.get(t.va/t.knee);coeff.plateSlopeDen=t.rp*t.ia;}
+ const auto& t=coeff.tubeData;const auto& ps=coeff.ps;bool cathodeBias=m==PowerModel::AC30;double target=coeff.target;if(!ready||active!=chosen){bias=biasFor(t,target,q.screen*target/q.B);cathodeV=cathodeBias?-bias:0;grid1.charge=cathodeBias?0:-bias;grid2.charge=grid1.charge;active=chosen;ready=true;}
  // 0 dBu = .775 Vrms; -14 dBFS sine = .1995 peak.
  double v=x*5.493063;
  v=preamp.process(v,supply*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence)*((controls.preamp==PreampModel::Jose&&controls.joseArchitecture!=JoseArchitecture::Stock&&!controls.joseSAT)?1.:controls.master);
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
- double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC);
+ double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,coeff.presenceR,q.presenceC);
  double d1,d2;pi.process(clamp(v,-30.,30.),controls.inverterOnly?0.:feedback,supply*.72,dt,d1,d2,ps,controls.eco);if(controls.inverterOnly)return (d1-d2)/100.;
- if(m==PowerModel::AC30){double diff=d1-d2;double r=1000.+250000.*(1-controls.presence);double sourceR=100000.;double a=dt/4.7e-9;double i=(diff-cutState)/(r+sourceR+a);cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
- if(m==PowerModel::RectoModern&&!isRecto(controls.preamp)){double diff=d1-d2;double high=diff-lp(diff,modernState,2200,dt);double atten=.65*(1-controls.presence)*high;d1-=atten*.5;d2+=atten*.5;}
+ if(m==PowerModel::AC30){double diff=d1-d2;double sourceR=100000.;double a=coeff.cutA;double i=(diff-cutState)/coeff.cutDen;cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
+ if(m==PowerModel::RectoModern&&!isRecto(controls.preamp)){double diff=d1-d2;modernState+=coeff.modernAlpha*(diff-modernState);double high=diff-modernState;double atten=coeff.modernGain*high;d1-=atten*.5;d2+=atten*.5;}
  double g1=grid1.process(d1,cathodeBias?0:bias,dt,ps)-cathodeV,g2=grid2.process(d2,cathodeBias?0:bias,dt,ps)-cathodeV;
 
  // Solve plate/screen current against the same instantaneous reflected voltage.
  struct Branch {double ip,is;};
- auto branch=[&](double vp,double vg){const double plateV=vp-cathodeV;const double collect=1+2*valveExp.get(std::max(0.,plateV)/t.knee);const double share=t.is/t.ia;const double ref=1+2*valveExp.get(t.va/t.knee);auto screenAt=[&](double vs){return emission(t,vg,vs)*share*collect/ref*std::max(0.,vs)/t.vs;};double low=0,high=screen,fl=-screen,fh=screenAt(std::max(0.,screen-cathodeV))*q.screenR;double vs=screen,lastScreenCurrent=0;for(int j=0;j<(controls.eco?3:6);++j){vs=low+(high-low)*(-fl)/(fh-fl);lastScreenCurrent=screenAt(std::max(0.,vs-cathodeV));double f=vs+lastScreenCurrent*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}return Branch{plate(t,plateV,vg,std::max(0.,vs-cathodeV)),lastScreenCurrent};};
+ auto branch=[&](double vp,double vg){const double plateV=vp-cathodeV;const double collect=1+2*valveExp.get(std::max(0.,plateV)/t.knee);auto emit=[&](double vs){double u=std::max(0.,coeff.u0+vg-t.vg+(vs-t.vs)/t.mu);return t.ia*(u/coeff.u0)*std::sqrt(u/coeff.u0);};auto screenAt=[&](double vs){return emit(vs)*coeff.share*collect/coeff.ref*std::max(0.,vs)/t.vs;};double low=0,high=screen,fl=-screen,fh=screenAt(std::max(0.,screen-cathodeV))*q.screenR;double vs=screen,lastScreenCurrent=0;for(int j=0;j<(controls.eco?3:6);++j){vs=low+(high-low)*(-fl)/(fh-fl);lastScreenCurrent=screenAt(std::max(0.,vs-cathodeV));double f=vs+lastScreenCurrent*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}const double p=std::max(0.,plateV);const double knee=(1-valveExp.get(p/t.knee))/coeff.plateRef;const double slope=std::max(0.,1+(p-t.va)/coeff.plateSlopeDen);return Branch{emit(std::max(0.,vs-cathodeV))*knee*slope,lastScreenCurrent};};
  // Implicit quasi-static primary load line; speaker dynamic state remains explicit.
  const double loadHistory=coeff.capG*capV-indI;
  const double reflectedHistory=(loadHistory*coeff.invG-coeff.coilG*coilI)/coeff.invRatio;
@@ -102,6 +115,6 @@ struct Engine {
  double processPreampOnly(double x){double v=x*(.775*std::sqrt(2.)/std::pow(10.,-14./20.));
  v=preamp.process(v,powerCircuit(selectedPower()).B*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence)*((controls.preamp==PreampModel::Jose&&controls.joseArchitecture!=JoseArchitecture::Stock&&!controls.joseSAT)?1.:controls.master);
  return std::clamp(v/30.,-1.,1.);}
- double process(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j){double y=step(prev+(x-prev)*j/oversampling);if(!std::isfinite(y)){reset();return 0;}out+=y;}prev=x;double y=out/oversampling;return std::clamp(y-lp(y,outputDC,8.,1./fs),-1.,1.);}
+ double process(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j){double y=step(prev+(x-prev)*j/oversampling);if(!std::isfinite(y)){reset();return 0;}out+=y;}prev=x;double y=out/oversampling;outputDC+=coeff.outputAlpha*(y-outputDC);return std::clamp(y-outputDC,-1.,1.);}
 };
 }
