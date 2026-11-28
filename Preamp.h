@@ -62,17 +62,18 @@ inline PreampSpec evhSpec(EVHVoice voice,ColdBias bias,CathodeBypass bypass){
  }
  return p;
 }
+inline double audioPot(double x){x=std::clamp(x,0.,1.);return x<=.5?.2*x:.1+1.8*(x-.5);}
 struct PreampStage {
  double cath=0, coupling=0, peak=0, lastCurrent=0, plateFiltered=0; bool init=false;
  std::array<double,7> coeffKey{};bool coeffReady=false;double gc=0,gp=0,gr=0,gl=0,link=0,den=0,effective=0;
- double process(double in,double supply,double dt,const StageSpec& s,double pot=1.,double bright=0.,bool usePot=false,bool eco=false,double volume=1.,bool postEQ=false){
+ double process(double in,double supply,double dt,const StageSpec& s,double pot=1.,double bright=0.,bool usePot=false,bool eco=false,double volume=1.,bool postEQ=false,bool rectoGain=false){
  // Implicit coupling capacitor/grid leak and piecewise grid conduction.
  // Backward-Euler nodal solve: coupling cap, series peaker, pot and grid load.
- const std::array<double,7> key{dt,s.cc,s.rg,s.atten,s.peakC+bright,pot,usePot?1.:0.};
+ const std::array<double,7> key{dt,s.cc,s.rg,s.atten,s.peakC+bright,pot,rectoGain?2.:usePot?1.:0.};
  if(!coeffReady||key!=coeffKey){
  const double top=usePot?std::max(1.,1e6*(1.-pot)):1.;
  const double bottom=usePot?std::max(1.,1e6*pot):1e12;
- const double rs=std::max(1.,38000.+s.rg*(1./std::max(.001,s.atten)-1.)+top);
+ const double rs=rectoGain?2200000.+470000.+top:std::max(1.,38000.+s.rg*(1./std::max(.001,s.atten)-1.)+top);
  gc=s.cc/dt;gp=(s.peakC+bright)/dt;gr=1./rs;gl=1./s.rg+1./bottom;
  link=gr+gp;den=gc+link;effective=link*gc/den;
  coeffKey=key;coeffReady=true;
@@ -165,7 +166,9 @@ struct Preamp {
  const double caps[]={0.,100e-12,220e-12,470e-12,1e-9,2.2e-9,4.7e-9,5e-9};
  const double native=(model==PreampModel::Marshall||arch==JoseArchitecture::Stock)?470e-12:0.; // provisional until individual layouts are traced
  double bright=first&&(model==PreampModel::Marshall||model==PreampModel::Jose)?(brightMode==8?native:caps[std::clamp(brightMode,0,7)]):0.;
- v=stages[i].process(v,supply,dt,p.stages[i],pos,bright,first||second,eco);
+ const bool revF=isRecto(model)&&(model==PreampModel::RectoOrange||model==PreampModel::RectoRed);
+ if(revF&&first)bright=1e-9;
+ v=stages[i].process(v,supply,dt,p.stages[i],pos,bright,first||second,eco,1.,false,revF&&first);
  }
 
  // Reduced cathode follower: unity-ish gain with asymmetric headroom, DC removed.
@@ -180,7 +183,7 @@ struct Preamp {
  const bool narrow=recto==RectoVoice::EarlyOrangeModern||recto==RectoVoice::RoadKing3Modern;
  const double presenceR=modern?22000.+((narrow||recto==RectoVoice::EarlyRed)?25000.:100000.)*std::clamp(presence,0.,1.):0.;
  if(rectoFamily){p.cb=20e-9;p.cm=20e-9;}
- v=tone.process(v,dt,bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.,presenceR);
+ v=tone.process(v,dt,(model==PreampModel::Marshall||(model==PreampModel::Jose&&arch==JoseArchitecture::Stock))?audioPot(bass):bass,mid,treble,p.slope,p.ct,p.cb,p.cm,model==PreampModel::Jose && arch==JoseArchitecture::Snorkler?38000.:600.,presenceR);
  if(clipping&&postEQ)v=jose.process(v,dt,era,volume);return v;
  }
 };

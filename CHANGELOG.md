@@ -77,3 +77,6 @@ Restore native presence/negative feedback network in Economy using previous inte
 
 ## 0.3.19 — Low-level solver resolution and gain taper
 Detailed primary solve uses safeguarded secant/bisection with 1e-7 V convergence and expandable bracket; screen solve tightened to 1e-7 V residual, up to 32 iterations. No artificial gate or gain reduction. Preamp gain pots use provisional 10% audio taper at midpoint; maximum gain and interstage values unchanged. Exact hardware tapers and interstage measurements pending. Increased CPU cost possible; build and listening tests pending.
+
+## 0.3.20 — Initial schematic-informed gain staging
+Early Rectifier gain network uses provisional lumped 2.2M series + 470k stopper + pot resistance and adds 1nF to existing effective peaker; this is not a full nodal transcription (shunt, switched bypass, separate bright cap and 20pF still pending). Rectifier preamp supply ratio 0.90 instead of 0.65 as provisional common-node approximation to 415V at nominal 460V. Stock Marshall audio bass/master taper, approximate 10% midpoint. Input/output calibration unchanged. No power solver changes. Build/audio unverified.

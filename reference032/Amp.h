@@ -66,9 +66,9 @@ struct Engine {
  // 0 dBu = .775 Vrms; -14 dBFS sine = .1995 peak.
  double v=x*5.493063;
  if(!controls.powerOnly){
- v=preamp.process(v,supply*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence,controls.pittHi,controls.pittBoost,controls.pittEdge,controls.pittShift);
+ v=preamp.process(v,supply*(isRecto(controls.preamp)?.90:.65),dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence,controls.pittHi,controls.pittBoost,controls.pittEdge,controls.pittShift);
  if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
- } if(!controls.benchDirect)v*=controls.master*controls.master;
+ } if(!controls.benchDirect)v*=(controls.preamp==PreampModel::Marshall||(controls.preamp==PreampModel::Jose&&controls.joseArchitecture==JoseArchitecture::Stock))?audioPot(controls.master):controls.master*controls.master;
  debugPreamp=std::isfinite(v)?std::clamp(v/30.,-1.,1.):0.;
  // Feedback uses previous oversampled secondary voltage; bounded explicit loop.
  double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(fb*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC);
@@ -109,7 +109,7 @@ struct Engine {
  capV=(nextI+history)*coeff.invG;indI+=coeff.indStep*capV;coilI=nextI;fb=q.load*.8*coilI+capV+(.0005/dt)*(coilI-oldCoilI);return 0.251188643150958*fb/std::sqrt(2.*q.load*100.);
  }
  double preampOnlyStep(double x){double v=x*(.775*std::sqrt(2.)/std::pow(10.,-14./20.));
- v=preamp.process(v,(powerCircuit(selectedPower()).B*(controls.spongy?.85:1.)-(controls.tubeRect?20.:0.))*.65,dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence,controls.pittHi,controls.pittBoost,controls.pittEdge,controls.pittShift);
+ v=preamp.process(v,(powerCircuit(selectedPower()).B*(controls.spongy?.85:1.)-(controls.tubeRect?20.:0.))*(isRecto(controls.preamp)?.90:.65),dt,controls.preamp,controls.gain,controls.bass,controls.mid,controls.treble,controls.joseEra,controls.joseExtraStage,controls.joseGain2,controls.joseArchitecture,controls.preamp==PreampModel::Jose?controls.joseBias:controls.coldBias,controls.preamp==PreampModel::Jose?controls.joseBypass:controls.coldBypass,controls.rectoVoice,controls.evhVoice,controls.eco,controls.joseSAT?1.:controls.volume,controls.joseArchitecture==JoseArchitecture::JosePostEQ,controls.brightMode,controls.presence,controls.pittHi,controls.pittBoost,controls.pittEdge,controls.pittShift);
  if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
  return 0.251188643150958*v/30.;}
  double processPreampOnly(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j)out+=preampOnlyStep(prev+(x-prev)*j/oversampling);prev=x;return out/oversampling;}
