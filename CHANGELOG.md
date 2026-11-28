@@ -169,3 +169,7 @@ Use Economy's 32-iteration bracketed feedback algorithm and tolerance for detail
 
 ## 0.3.44 — Gain staging audit corrections
 Remove artificial Max digital output clamp; retain DC blocking. Light comparison uses normal power-only path with master unity rather than benchDirect (which bypasses Economy when added to comparison). No physical gain, bias, clipping or Economy changes pending measured input sensitivity and rated output tests.
+
+
+## 0.3.45 — Bias and gain audit instrumentation
+Expose accepted plate and screen currents for standalone measurements. Add physical input-voltage sweep, idle bias and output gain/THDN diagnostics across all four modes, with feedback on/off. No bias or gain adjustment pending results. Economy current probes not applicable. Build and results pending.

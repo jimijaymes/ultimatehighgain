@@ -46,7 +46,7 @@ struct Triode {
 };
 struct Engine {
  struct Prepared {double dt=0;PowerModel model=PowerModel::Marshall;bool tubeRect=false;double invRatio,magStep,invFlux,capG,invG,coilG,invDen,indStep,rs,supplyStep,invSupplyR,screenAlpha,feedbackScale;}; Prepared coeff{};
- Circuit circuit; Controls controls; int oversampling=1; double fs=48000,dt=1./48000; Preamp preamp; PhaseInverter pi; GridCoupling grid1,grid2; double magI=0; PresenceNetwork presenceNet; double supply=450, screen=440,bias=-40, fb=0,fbLow=0,flux=0,leak=0,capV=0,indI=0,coilI=0, bassZ=0,trebleZ=0, prev=0,gridBlock=0; double sagCurrentSum=0, sagScreenSum=0; int sagCount=0; double debugPreamp=0; double outputDC=0; double screenEstimate1=440,screenEstimate2=440; double peakPlate=0,cathodeV=0,cutState=0,modernState=0; Tube active=Tube::EL34; bool ready=false; PowerModel activePower=PowerModel::Marshall;
+ Circuit circuit; Controls controls; int oversampling=1; double fs=48000,dt=1./48000; Preamp preamp; PhaseInverter pi; GridCoupling grid1,grid2; double magI=0; PresenceNetwork presenceNet; double supply=450, screen=440,bias=-40, fb=0,fbLow=0,flux=0,leak=0,capV=0,indI=0,coilI=0, bassZ=0,trebleZ=0, prev=0,gridBlock=0; double sagCurrentSum=0, sagScreenSum=0; int sagCount=0; double debugPreamp=0; double outputDC=0; double screenEstimate1=440,screenEstimate2=440; double measuredPlate1=0,measuredPlate2=0,measuredScreen=0; double peakPlate=0,cathodeV=0,cutState=0,modernState=0; Tube active=Tube::EL34; bool ready=false; PowerModel activePower=PowerModel::Marshall;
  PowerModel selectedPower() const {if(!controls.linkPower)return controls.power; switch(controls.preamp){case PreampModel::Peavey5150:return PowerModel::Peavey;case PreampModel::DualRectifier:return rectoModern(controls.rectoVoice)?PowerModel::RectoModern:PowerModel::RectoVintage;case PreampModel::VHT:return PowerModel::VHT;case PreampModel::EVH5150III:return PowerModel::EVH;default:return PowerModel::Marshall;}}
 
  void prepare(double rate){fs=rate;dt=1/(oversampling*fs);reset();}
@@ -121,7 +121,7 @@ struct Engine {
  for(int k=0;k<24;++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.00001){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
  primaryV=(lo+hi)*.5;const bool reuse=cached&&cachedV==primaryV;auto a1=reuse?cachedA:branch(supply-primaryV*.5,g1),a2=reuse?cachedB:branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
- double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double rk=47.;double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/(1+dt/(rk*ck)),0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
+ double screens=(a1.is+a2.is)*q.pairs;measuredPlate1=i1;measuredPlate2=i2;measuredScreen=screens;if(cathodeBias){double rk=47.;double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/(1+dt/(rk*ck)),0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
  // Backward Euler reservoir update avoids stiff explicit supply oscillation.
  supply=clamp((supply+coeff.supplyStep*(target*coeff.invSupplyR-current))/(1+coeff.supplyStep*coeff.invSupplyR),target*.45,target);
  screen+=coeff.screenAlpha*(clamp(supply-(q.B-q.screen)-screens*100,30.,supply)-screen);
