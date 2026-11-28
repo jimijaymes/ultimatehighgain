@@ -39,6 +39,7 @@ struct PhaseInverter {
  double available=std::max(0.,supply-cath);
  constexpr double K=.0012/(1.125*1.0606601717798212);
  double u=std::max(0.,1.125+grid-cath+2+(available-250)/100);
+ if(u<=0.||available<=0.)return 0.;
  double lo=0,hi=available/r;
  double i=std::clamp(K*triodeLoad.get(u,K*r/100.),lo,hi);
  for(int k=0;k<20;++k){
@@ -58,6 +59,7 @@ struct PhaseInverter {
  if(cachedDt!=dt){cachedDt=dt;alpha=1-std::exp(-6.283185307*2*dt);}if(cachedBias!=spec.biasR||cachedTail!=spec.tail){cachedBias=spec.biasR;cachedTail=spec.tail;gridFactor=1-spec.biasR/spec.tail;}
  double lo=0,hi=supply;double i1=0,i2=0;
  double cath=initialized?std::clamp(tailEstimate,lo,hi):supply*.03;
+ double prevCath=0.,prevF=0.;bool havePrev=false;
  for(int k=0;k<(eco?14:20);++k){
  double gridDC=cath*gridFactor;
  i1=current(input+gridDC,cath,supply,spec.plate1);
@@ -65,7 +67,10 @@ struct PhaseInverter {
  double f=(i1+i2)*spec.tail-cath;
  if(std::abs(f)<1e-5)break;
  if(f>0)lo=cath;else hi=cath;
- cath=(lo+hi)*.5;
+ if(k+1==(eco?14:20))break;
+ double next=(lo+hi)*.5;
+ if(eco&&havePrev&&f!=prevF){const double sec=cath-f*(cath-prevCath)/(f-prevF);if(sec>lo&&sec<hi)next=sec;}
+ prevCath=cath;prevF=f;havePrev=true;cath=next;
  }
  tailEstimate=cath;
  double p1=supply-i1*spec.plate1,p2=supply-i2*spec.plate2;if(!initialized){dc1=p1;dc2=p2;initialized=true;}dc1+=alpha*(p1-dc1);dc2+=alpha*(p2-dc2);o1=dc1-p1;o2=dc2-p2;
