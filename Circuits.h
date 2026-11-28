@@ -103,10 +103,12 @@ struct PhaseInverter {
    return std::array<double,2>{p,K*u*std::sqrt(u)*std::clamp((p-cath)/10.,0.,1.)};
   };
   double lo=0,hi=supply,cath=std::clamp(tailEstimate,lo,hi);
-  std::array<double,2> a{},b{};
+  std::array<double,2> a{},b{};double prevCath=0,prevF=0;bool havePrev=false;
   for(int k=0;k<32;++k){a=solve(input,cath,spec.plate1,dc1,charge1);b=solve(feedback,cath,spec.plate2,dc2,charge2);
    double f=(a[1]+b[1])*spec.tail-cath;if(std::abs(f)<1e-5||k==31)break;
-   if(f>0)lo=cath;else hi=cath;cath=(lo+hi)*.5;
+   if(f>0)lo=cath;else hi=cath;double next=(lo+hi)*.5;
+   if(fast&&havePrev&&f!=prevF){const double sec=cath-f*(cath-prevCath)/(f-prevF);if(sec>lo&&sec<hi)next=sec;}
+   prevCath=cath;prevF=f;havePrev=true;cath=next;
   }
   tailEstimate=cath;
   // Keep the unloaded DC reference: tracking loaded plate DC would erase blocking shifts.
