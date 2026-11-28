@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2 — Shared solver optimisation (unverified)
+- Apply identical redundant screen-current and converged branch reuse to Economy as Standard.
+- Preserve Economy iteration budgets and tolerances; no further approximations.
+- Build, null comparison and CPU benchmark pending.
+
 ## 0.3.1 — Standard solver redundancy removal (unverified)
 - Reuse final screen-current evaluation and converged branch results at identical primary voltage; reuse reactive history.
 - Economy iteration budgets and branch evaluation path retained. No circuit or tolerance changes.
