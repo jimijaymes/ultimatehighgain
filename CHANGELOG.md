@@ -149,3 +149,7 @@ Add safeguarded secant predictor to the detailed global feedback root solve, pre
 
 ## 0.3.39 — Restore explicit detailed negative feedback
 Restore pre-0.3.26 previous-internal-sample secondary feedback in Standard and Max, removing global iterative rollback and 0.3.38 predictor. Retain current detailed forward circuit, primary precision, supply isolation/linking, Economy and native open-loop paths. User reports feedback-enabled host CPU overload. One forward evaluation per internal sample; explicit delay can reintroduce instability, so verify diagnostics and host before acceptance. Baseline032 unchanged.
+
+
+## 0.3.40 — Rectifier Modern presence routing
+Remove provisional 2.2 kHz differential PI attenuation in Standard, Economy and Max. Modern presence remains in the Rectifier preamp tone network; native Modern power stage remains open-loop independent of preamp voice. Mesa original and Multi-Watt manuals specify Modern presence moves to preamp and is inactive at FX return (https://mesa-boogie.imgix.net/media/User%20Manuals/3chRecto_multiWatt.pdf). This is a routing correction, not a verified component-level preamp schematic transcription. Build and listening verification pending.

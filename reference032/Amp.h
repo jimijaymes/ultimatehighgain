@@ -99,7 +99,7 @@ struct Engine {
  double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(terminal*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,q.presenceR*(1-clamp(controls.presence,0.,1.)),q.presenceC,nativeDepth(m,controls.evhVoice)?controls.resonance:0.);
  double d1,d2;if(controls.inverterOnly){pi.process(v,0.,supply*.72,dt,d1,d2,ps,controls.eco);return (d1-d2)/100.*0.251188643150958;}pi.process(v,feedback,supply*.72,dt,d1,d2,ps,controls.eco);
  if(m==PowerModel::AC30){double diff=d1-d2;double r=1000.+250000.*(1-controls.presence);double sourceR=100000.;double a=dt/4.7e-9;double i=(diff-cutState)/(r+sourceR+a);cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
- if(m==PowerModel::RectoModern&&(controls.powerOnly||!isRecto(controls.preamp)||!rectoModern(controls.rectoVoice))){double diff=d1-d2;double high=diff-lp(diff,modernState,2200,dt);double atten=.65*(1-controls.presence)*high;d1-=atten*.5;d2+=atten*.5;}
+ // Modern presence belongs to the preamp; no invented PI high-cut in power-only or modular mode.
  double g1=grid1.process(d1,cathodeBias?0:bias,dt,ps,cathodeV)-cathodeV,g2=grid2.process(d2,cathodeBias?0:bias,dt,ps,cathodeV)-cathodeV;
 
  // Solve plate/screen current against the same instantaneous reflected voltage.

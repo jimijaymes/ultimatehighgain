@@ -116,7 +116,7 @@ struct Engine {
  double feedback=(controls.disableFeedback||activePower==PowerModel::RectoModern||activePower==PowerModel::AC30)?0.:presenceNet.process(terminal*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,coeff.presenceR,q.presenceC,nativeDepth(m,controls.evhVoice)?controls.resonance:0.);
  double d1,d2;if(controls.inverterOnly){pi.process(v,0.,supply*.72,dt,d1,d2,ps,controls.eco);return (d1-d2)/100.*0.251188643150958;}pi.process(v,feedback,supply*.72,dt,d1,d2,ps,controls.eco);
  if(m==PowerModel::AC30){double diff=d1-d2;double sourceR=100000.;double a=coeff.cutA;double i=(diff-cutState)/coeff.cutDen;cutState+=a*i;d1-=i*sourceR*.5;d2+=i*sourceR*.5;}
- if(m==PowerModel::RectoModern&&(controls.powerOnly||!isRecto(controls.preamp)||!rectoModern(controls.rectoVoice))){double diff=d1-d2;modernState+=coeff.modernAlpha*(diff-modernState);double high=diff-modernState;double atten=coeff.modernGain*high;d1-=atten*.5;d2+=atten*.5;}
+ // Modern presence belongs to the preamp; no invented PI high-cut in power-only or modular mode.
  
  double g1=grid1.process(d1,cathodeBias?0:bias,dt,ps,cathodeV)-cathodeV,g2=grid2.process(d2,cathodeBias?0:bias,dt,ps,cathodeV)-cathodeV;
 
@@ -162,7 +162,7 @@ struct Engine {
  double feedback=closed?presenceNet.process(terminal*coeff.feedbackScale,dt,q.feedbackR,q.feedbackGround,coeff.presenceR,q.presenceC,nativeDepth(m,controls.evhVoice)?controls.resonance:0.):0.;
  double a,b;pi.process(input,feedback,supply*.72,dt,a,b,ps,true);
  if(m==PowerModel::AC30){double i=(a-b-cutState)/coeff.cutDen;cutState+=coeff.cutA*i;a-=i*50000.;b+=i*50000.;}
- if(m==PowerModel::RectoModern&&(controls.powerOnly||!isRecto(controls.preamp)||!rectoModern(controls.rectoVoice))){double diff=a-b;modernState+=coeff.modernAlpha*(diff-modernState);double atten=coeff.modernGain*(diff-modernState);a-=atten*.5;b+=atten*.5;}
+ // Modern presence belongs to the preamp; no invented PI high-cut in power-only or modular mode.
  return economyPower(a-b,m,q);};
  if(!closed)return trial(0.);
  // Implicit feedback: evaluate from identical old states, commit only the accepted trial.
