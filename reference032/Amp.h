@@ -141,6 +141,6 @@ struct Engine {
  if(controls.preamp!=PreampModel::Jose)v*=controls.volume;
  return 0.251188643150958*v/30.;}
  double processPreampOnly(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j)out+=preampOnlyStep(prev+(x-prev)*j/oversampling);prev=x;return out/oversampling;}
- double process(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j){double y=step(prev+(x-prev)*j/oversampling);if(!std::isfinite(y)){reset();return 0;}out+=y;}prev=x;double y=out/oversampling;return std::clamp(y-lp(y,outputDC,8.,1./fs),-1.,1.);}
+ double process(double x){if(!std::isfinite(x))x=0;double out=0;for(int j=1;j<=oversampling;++j){double y=step(prev+(x-prev)*j/oversampling);if(!std::isfinite(y)){reset();return 0;}out+=y;}prev=x;double y=out/oversampling;return y-lp(y,outputDC,8.,1./fs);}
 };
 }

@@ -165,3 +165,7 @@ Precompute normalized screen-loaded emission response (257 x 129 floats, approxi
 
 ## 0.3.43 — Common implicit feedback baseline
 Use Economy's 32-iteration bracketed feedback algorithm and tolerance for detailed Standard, Light and Max with complete trial state replay. Economy unchanged; native open-loop modes bypass solve. This can increase CPU substantially; build and convergence not yet verified. Previous-sample mode deferred to explicit comparison selector.
+
+
+## 0.3.44 — Gain staging audit corrections
+Remove artificial Max digital output clamp; retain DC blocking. Light comparison uses normal power-only path with master unity rather than benchDirect (which bypasses Economy when added to comparison). No physical gain, bias, clipping or Economy changes pending measured input sensitivity and rated output tests.
