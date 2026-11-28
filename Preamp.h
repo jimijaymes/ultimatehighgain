@@ -85,6 +85,7 @@ struct PreampStage {
  double k=bypass?fixedCath:0.;
  double u=std::max(0.,1.125+grid-k+2+(supply-k-250)/100);
  double a=K*(s.rp/100+(bypass?0.:s.rk*1.01));
+ const double slopeFactor=s.rp/100+(bypass?0.:s.rk*1.01);const double plateResistance=s.rp+(bypass?0.:s.rk);
  double cur=std::clamp(lastCurrent,lo,hi);
  if(eco && std::abs(residual(cur))>2e-5)cur=std::clamp(K*triodeLoad.get(u,a),lo,hi);
  for(int n=0;n<24;++n){
@@ -93,8 +94,8 @@ struct PreampStage {
  double k=bypass?fixedCath:cur*s.rk;
  double vp=supply-cur*s.rp-k;
  double u=std::max(0.,1.125+grid-k+2+(vp-250)/100);
- double slope=1.5*K*std::sqrt(u)*(s.rp/100+(bypass?0.:s.rk*1.01))*std::clamp(vp/10.,0.,1.);
- if(vp>0&&vp<10)slope+=K*u*std::sqrt(u)*(s.rp+(bypass?0.:s.rk))/10.;
+ double slope=1.5*K*std::sqrt(u)*slopeFactor*std::clamp(vp/10.,0.,1.);
+ if(vp>0&&vp<10)slope+=K*u*std::sqrt(u)*plateResistance/10.;
  double next=cur+f/(1+slope);cur=(next>lo&&next<hi)?next:(lo+hi)*.5;
  }
  lastCurrent=cur;return cur;};
@@ -128,12 +129,12 @@ struct PreampStage {
  }else if(s.ck>0){
  // Implicit cathode capacitor update; monotonic current decreases with cathode voltage.
  double h=dt/s.ck, old=cath, lo=0,hi=std::max(old,supply);
- double next=std::clamp((old+h*i)/(1+h/s.rk),lo,hi);
+ const double cathDen=1+h/s.rk;double next=std::clamp((old+h*i)/cathDen,lo,hi);
  for(int n=0;n<16;++n){
- i=solve(vg,next,true);double f=old+h*i-next*(1+h/s.rk);
+ i=solve(vg,next,true);double f=old+h*i-next*cathDen;
  if(std::abs(f)<1e-7)break;
  if(f>0)lo=next;else hi=next;
- double trial=(old+h*i)/(1+h/s.rk);
+ double trial=(old+h*i)/cathDen;
  next=(trial>lo&&trial<hi)?trial:(lo+hi)*.5;
  }
  cath=next;i=solve(vg,cath,true);
