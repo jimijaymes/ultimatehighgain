@@ -6,8 +6,8 @@ namespace uhg {
 // Backward Euler nodal passive tone stack: slope resistor, three capacitors,
 // bass rheostat, mid rheostat, treble potentiometer and master input load.
 struct ToneStack {
- double history[3]{}; double inverse[6][6]{}; double key[9]{}; bool cached=false;
- double process(double in,double dt,double bass,double mid,double treble,double slope=33000,double ct=470e-12,double cb=22e-9,double cm=22e-9,double sourceR=0){
+ double history[3]{}; double presenceCharge=0; double inverse[6][6]{}; double key[10]{}; bool cached=false;
+ double process(double in,double dt,double bass,double mid,double treble,double slope=33000,double ct=470e-12,double cb=22e-9,double cm=22e-9,double sourceR=0,double presenceResistance=0){
  double a[6][7]{}; // slope, treble top, bass top, lower stack, wiper
  auto stamp=[&](int i,int j,double g,double h=0.){if(i>=0){a[i][i]+=g;a[i][6]+=h;}if(j>=0){a[j][j]+=g;a[j][6]-=h;}if(i>=0&&j>=0){a[i][j]-=g;a[j][i]-=g;}};
  auto cap=[&](int i,int j,double c,int k,double source=0.){double g=c/dt;stamp(i,j,g,g*(history[k]+source));};
@@ -15,17 +15,20 @@ struct ToneStack {
  cap(1,5,ct,0);cap(0,2,cb,1);cap(0,3,cm,2);
  stamp(2,3,1./(100+1e6*bass));stamp(3,-1,1./(100+25000*mid));
  stamp(1,4,1./(100+250000*(1-treble)));stamp(4,2,1./(100+250000*treble));stamp(4,-1,1e-6);
- double nextKey[]={dt,bass,mid,treble,slope,ct,cb,cm,sourceR};
- if(!cached||!std::equal(key,key+9,nextKey)){
+ // Series RC shunt at treble wiper, eliminated analytically using backward Euler.
+ const double pg=presenceResistance>0?1./(presenceResistance+dt/3e-9):0.;
+ stamp(4,-1,pg,pg*presenceCharge);
+ double nextKey[]={dt,bass,mid,treble,slope,ct,cb,cm,sourceR,presenceResistance};
+ if(!cached||!std::equal(key,key+10,nextKey)){
  double m[6][12]{};
  for(int i=0;i<6;++i){for(int j=0;j<6;++j)m[i][j]=a[i][j];m[i][i+6]=1.;}
  for(int k=0;k<6;++k){double d=m[k][k];for(int j=0;j<12;++j)m[k][j]/=d;for(int i=0;i<6;++i)if(i!=k){double f=m[i][k];for(int j=0;j<12;++j)m[i][j]-=f*m[k][j];}}
  for(int i=0;i<6;++i)for(int j=0;j<6;++j)inverse[i][j]=m[i][j+6];
- std::copy(nextKey,nextKey+9,key);cached=true;
+ std::copy(nextKey,nextKey+10,key);cached=true;
  }
  double result[6]{};for(int i=0;i<6;++i)for(int j=0;j<6;++j)result[i]+=inverse[i][j]*a[j][6];
  for(int i=0;i<6;++i)a[i][6]=result[i];
- history[0]=a[1][6]-a[5][6];history[1]=a[0][6]-a[2][6];history[2]=a[0][6]-a[3][6];return a[4][6];
+ history[0]=a[1][6]-a[5][6];history[1]=a[0][6]-a[2][6];history[2]=a[0][6]-a[3][6];if(pg>0)presenceCharge+=dt/3e-9*pg*(a[4][6]-presenceCharge);else presenceCharge=0;return a[4][6];
  }
 };
 // Reduced-order shared-tail nonlinear LTP, DC operating point removed.
