@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(UltimateHighGainDSP VERSION 0.3.45 LANGUAGES C CXX)
+project(UltimateHighGainDSP VERSION 0.3.46 LANGUAGES C CXX)
 add_executable(uhg_test test.cpp)
 target_compile_features(uhg_test PRIVATE cxx_std_17)
 enable_testing()
@@ -70,3 +70,6 @@ target_compile_features(light_compare PRIVATE cxx_std_17)
 
 add_executable(bias_audit bias_audit.cpp)
 target_compile_features(bias_audit PRIVATE cxx_std_17)
+
+add_executable(feedback_stability feedback_stability.cpp)
+target_compile_features(feedback_stability PRIVATE cxx_std_17)

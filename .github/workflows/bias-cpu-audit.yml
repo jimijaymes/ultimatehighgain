@@ -3,14 +3,17 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+concurrency:
+  group: bias-cpu-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        target: [bias_audit, light_compare]
+        target: [bias_audit, light_compare, power_diagnostics, feedback_stability]
     steps:
       - uses: actions/checkout@v4
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

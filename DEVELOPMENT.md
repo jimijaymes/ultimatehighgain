@@ -178,3 +178,7 @@ Expose accepted plate and screen currents for standalone measurements. Add physi
 
 ### Diagnostic-only CI update
 Run bias_audit and four-mode light_compare in separate Linux Release jobs on main pushes; upload CSV. CPU timing is single-pass and cross-run comparisons are provisional. No DSP change.
+
+## 0.3.46 — Four-mode feedback regression coverage
+- Expand bias audit to all ten power models and power diagnostics to Light alongside Standard, Economy and Max; no AC30 failure exemption in standalone exit status.
+- Add independent Linux full/power/PI-path idle, driven and recovery CSV across four modes, feedback on/off, 44.1/48/96 kHz and linked presence/depth sweeps. Full path uses default preamp with independently selected power model. Cancel superseded Linux audit runs. No DSP changes; AC30 correction pending circuit verification. Build and results pending.
