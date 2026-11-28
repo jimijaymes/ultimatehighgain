@@ -47,3 +47,6 @@ Added standalone calibration executable, default Rectifier sweep and --all for a
 
 ## 0.3.9 — Output stage stability investigation
 User reports PI-only works, full/power-only spit or cut out with high idle meter. Removed inconsistent post-solve transformer saturation from both engines; reactive load retained. Implicit reservoir update and screen solver denominator guard. These are diagnostic corrections, not verified fixes. Restore physically coupled transformer saturation after calibration. Build and bench results pending.
+
+## 0.3.10 — Economy solver optimization
+Reuse final screen emission and plate exponential in Standard/Economy; hoist per-sample grid terms. Economy PI tail solver uses bracketed secant with midpoint fallback, unchanged iteration cap and residual tolerance. Cutoff current early return. Max untouched. No new reduced-rate states or precision cuts. Numerical equivalence, runtime and build not verified.
