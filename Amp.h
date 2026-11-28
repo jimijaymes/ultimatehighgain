@@ -93,7 +93,7 @@ struct Engine {
 
  // Solve plate/screen current against the same instantaneous reflected voltage.
  struct Branch {double ip,is;};
- auto branch=[&](double vp,double vg){const double plateV=vp-cathodeV;const double collect=1+2*valveExp.get(std::max(0.,plateV)/t.knee);auto emit=[&](double vs){double u=std::max(0.,coeff.u0+vg-t.vg+(vs-t.vs)/t.mu);return t.ia*(u/coeff.u0)*std::sqrt(u/coeff.u0);};auto screenAt=[&](double vs){return emit(vs)*coeff.share*collect/coeff.ref*std::max(0.,vs)/t.vs;};double low=0,high=screen,fl=-screen,fh=screenAt(std::max(0.,screen-cathodeV))*q.screenR;double vs=screen,lastScreenCurrent=0;for(int j=0;j<(controls.eco?3:6);++j){vs=low+(high-low)*(-fl)/(fh-fl);lastScreenCurrent=screenAt(std::max(0.,vs-cathodeV));double f=vs+lastScreenCurrent*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}const double p=std::max(0.,plateV);const double knee=(1-valveExp.get(p/t.knee))/coeff.plateRef;const double slope=std::max(0.,1+(p-t.va)/coeff.plateSlopeDen);return Branch{emit(std::max(0.,vs-cathodeV))*knee*slope,lastScreenCurrent};};
+ auto branch=[&](double vp,double vg){const double plateV=vp-cathodeV;const double collect=1+2*valveExp.get(std::max(0.,plateV)/t.knee);auto emit=[&](double vs){double u=std::max(0.,coeff.u0+vg-t.vg+(vs-t.vs)/t.mu);return t.ia*(u/coeff.u0)*std::sqrt(u/coeff.u0);};auto screenAt=[&](double vs){return emit(vs)*coeff.share*collect/coeff.ref*std::max(0.,vs)/t.vs;};double low=0,high=screen,fl=-screen,fh=screenAt(std::max(0.,screen-cathodeV))*q.screenR;double vs=screen,lastScreenCurrent=0;for(int j=0;j<(controls.eco?3:6);++j){vs=(fh>fl)?low+(high-low)*(-fl)/(fh-fl):low;lastScreenCurrent=screenAt(std::max(0.,vs-cathodeV));double f=vs+lastScreenCurrent*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}const double p=std::max(0.,plateV);const double knee=(1-valveExp.get(p/t.knee))/coeff.plateRef;const double slope=std::max(0.,1+(p-t.va)/coeff.plateSlopeDen);return Branch{emit(std::max(0.,vs-cathodeV))*knee*slope,lastScreenCurrent};};
  // Implicit quasi-static primary load line; speaker dynamic state remains explicit.
  const double loadHistory=coeff.capG*capV-indI;
  const double reflectedHistory=controls.benchResistive?0.:(loadHistory*coeff.invG-coeff.coilG*coilI)/coeff.invRatio;
@@ -106,11 +106,12 @@ struct Engine {
  primaryV=(lo+hi)*.5;const bool reuse=cached&&cachedV==primaryV;auto a1=reuse?cachedA:branch(supply-primaryV*.5,g1),a2=reuse?cachedB:branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
  double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/coeff.cathDen,0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
- double recharge=std::max(0.,(target-supply)*coeff.invSupplyR);supply=clamp(supply+coeff.supplyStep*(recharge-current),target*.45,target);
+ // Backward Euler reservoir update avoids stiff explicit supply oscillation.
+ supply=clamp((supply+coeff.supplyStep*(target*coeff.invSupplyR-current))/(1+coeff.supplyStep*coeff.invSupplyR),target*.45,target);
  screen+=coeff.screenAlpha*(clamp(supply-coeff.screenDrop-screens*100,30.,supply)-screen);
  double emf=primaryV;magI+=coeff.magStep*(emf-magI*100);flux+=dt*(emf-flux*35);
- double normalizedFlux=flux*coeff.invFlux;double sat=1/std::sqrt(1+normalizedFlux*normalizedFlux);
- double source=clamp(emf*sat*coeff.invRatio,-100.,100.);
+ // Use the same transformer voltage in the load solve and state update.
+ double source=emf*coeff.invRatio;
  if(controls.benchResistive){fb=source;return fb/std::sqrt(2.*q.load*100.);}
  double history=loadHistory;
  double nextI=(source+coeff.coilG*coilI-history*coeff.invG)*coeff.invDen;
