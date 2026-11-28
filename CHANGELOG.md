@@ -80,3 +80,6 @@ Detailed primary solve uses safeguarded secant/bisection with 1e-7 V convergence
 
 ## 0.3.20 — Initial schematic-informed gain staging
 Early Rectifier gain network uses provisional lumped 2.2M series + 470k stopper + pot resistance and adds 1nF to existing effective peaker; this is not a full nodal transcription (shunt, switched bypass, separate bright cap and 20pF still pending). Rectifier preamp supply ratio 0.90 instead of 0.65 as provisional common-node approximation to 415V at nominal 460V. Stock Marshall audio bass/master taper, approximate 10% midpoint. Input/output calibration unchanged. No power solver changes. Build/audio unverified.
+
+## 0.3.21 — Restore previous detailed power solver
+Revert only the primary and screen solver changes from 0.3.19 after reported clicks/pops and loss of audio. Preserve preamp, gain taper, headroom and Economy changes. Original low-level distortion remains unresolved. Build and audio verification pending.

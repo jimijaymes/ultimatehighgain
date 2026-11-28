@@ -79,7 +79,7 @@ struct Engine {
 
  // Solve plate/screen current against the same instantaneous reflected voltage.
  struct Branch {double ip,is;};
- auto branch=[&](double vp,double vg){const double plateV=vp-cathodeV;double low=0,high=screen,fl=-screen,fh=screenCurrent(t,plateV,vg,std::max(0.,screen-cathodeV))*q.screenR;double vs=screen,lastScreenCurrent=0;for(int j=0;j<32;++j){vs=(fh>fl)?low+(high-low)*(-fl)/(fh-fl):low;lastScreenCurrent=screenCurrent(t,plateV,vg,std::max(0.,vs-cathodeV));double f=vs+lastScreenCurrent*q.screenR-screen;if(std::abs(f)<1e-7)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}return Branch{plate(t,plateV,vg,std::max(0.,vs-cathodeV)),lastScreenCurrent};};
+ auto branch=[&](double vp,double vg){const double plateV=vp-cathodeV;double low=0,high=screen,fl=-screen,fh=screenCurrent(t,plateV,vg,std::max(0.,screen-cathodeV))*q.screenR;double vs=screen,lastScreenCurrent=0;for(int j=0;j<(controls.eco?3:6);++j){vs=(fh>fl)?low+(high-low)*(-fl)/(fh-fl):low;lastScreenCurrent=screenCurrent(t,plateV,vg,std::max(0.,vs-cathodeV));double f=vs+lastScreenCurrent*q.screenR-screen;if(std::abs(f)<.05)break;if(f>0){high=vs;fh=f;fl*=.5;}else{low=vs;fl=f;fh*=.5;}}return Branch{plate(t,plateV,vg,std::max(0.,vs-cathodeV)),lastScreenCurrent};};
  // Implicit quasi-static primary load line; speaker dynamic state remains explicit.
  const double loadHistory=coeff.capG*capV-indI;
  const double reflectedHistory=controls.benchResistive?0.:(loadHistory*coeff.invG-coeff.coilG*coilI)/coeff.invRatio;
@@ -90,9 +90,7 @@ struct Engine {
  Branch cachedA{},cachedB{};double cachedV=0;bool cached=false;
  auto residual=[&](double v){auto a=branch(supply-v*.5,g1),b=branch(supply+v*.5,g2);cachedA=a;cachedB=b;cachedV=v;cached=true;return ((a.ip-b.ip)*q.pairs*.5-magI/magDen+reflectedHistory/loadZ)*reflectedZ-v;};
  double primaryV=0;
- double fl=residual(lo),fh=residual(hi);
- for(int expand=0;expand<8&&(fl<0||fh>0);++expand){if(fl<0){lo*=2;fl=residual(lo);}if(fh>0){hi*=2;fh=residual(hi);}}
- for(int k=0;k<64;++k){double v=(lo+hi)*.5;const double sec=lo+(hi-lo)*fl/(fl-fh);if(k%4!=3&&std::isfinite(sec)&&sec>lo+.05*(hi-lo)&&sec<hi-.05*(hi-lo))v=sec;double f=residual(v);if(std::abs(f)<1e-7||hi-lo<1e-7){lo=hi=v;break;}if(f>0){lo=v;fl=f;}else{hi=v;fh=f;}}
+ for(int k=0;k<(controls.eco?12:16);++k){double v=(lo+hi)*.5;double f=residual(v);if(std::abs(f)<.002){lo=hi=v;break;}if(f>0)lo=v;else hi=v;}
  primaryV=(lo+hi)*.5;const bool reuse=cached&&cachedV==primaryV;auto a1=reuse?cachedA:branch(supply-primaryV*.5,g1),a2=reuse?cachedB:branch(supply+primaryV*.5,g2);double i1=a1.ip,i2=a2.ip;
  peakPlate=std::max(peakPlate,std::max(i1,i2)*supply);
  double screens=(a1.is+a2.is)*q.pairs;if(cathodeBias){double rk=47.;double ck=250e-6;cathodeV=clamp((cathodeV+dt*((i1+i2)*q.pairs+screens)/ck)/(1+dt/(rk*ck)),0.,80.);}double current=(i1+i2)*q.pairs+screens+.008;
