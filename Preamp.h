@@ -152,8 +152,8 @@ struct Preamp {
  bool first=i==p.gainAfter+1;
  bool second=model==PreampModel::Jose && arch!=JoseArchitecture::Stock && arch!=JoseArchitecture::Molecular && i==2;
  double pos=first?std::clamp(gain,0.,1.):second?std::clamp(gain2,0.,1.):1.;
- // Preserve existing choice indices; additional values are generic modification options.
- const double caps[]={0.,470e-12,4.7e-9,100e-12,220e-12,1e-9,2.2e-9,5e-9};
+ // Ascending capacitance order; additional values are generic modification options.
+ const double caps[]={0.,100e-12,220e-12,470e-12,1e-9,2.2e-9,4.7e-9,5e-9};
  const double native=(model==PreampModel::Marshall||arch==JoseArchitecture::Stock)?470e-12:0.; // provisional until individual layouts are traced
  double bright=first&&(model==PreampModel::Marshall||model==PreampModel::Jose)?(brightMode==8?native:caps[std::clamp(brightMode,0,7)]):0.;
  v=stages[i].process(v,supply,dt,p.stages[i],pos,bright,first||second,eco);
